@@ -1,0 +1,5 @@
+"
+peakFeatures = []
+peakFeatures.extend([meanSignal, meanSignalRest, meanSignalStress, meanSignalRecovery, meanStressIncrease])
+peakFeatures.extend([peakSTD, peakEntropy, restSlope, stressSlope, relaxationSlope])
+"
