@@ -116,7 +116,7 @@ class predictionModelHead:
         # possibleClassifications = list(set(signalLabels))
         classificationScores = []
         # Taking the Average Score Each Time
-        for _ in range(300):
+        for _ in range(200):
             # Train the Model with the Training Data
             Training_Data, Testing_Data, Training_Labels, Testing_Labels = train_test_split(signalData, signalLabels, test_size=testSplitRatio, shuffle= True, stratify=stratifyBy)
             self.predictionModel.model.fit(Training_Data, Training_Labels)
@@ -192,25 +192,26 @@ class predictionModelHead:
         t1 = time.time()
         # For Each Combination of Features
         for combinationInd in range(len(featureInds)):
-            listOfCombinationInds = featureInds[combinationInd]
+            combinationInds = featureInds[combinationInd]
             
             # Collect the Signal Data for the Specific Features
-            signalDataCull = signalData[:,listOfCombinationInds[0]]
-            for featureInd in listOfCombinationInds[1:]:
+            signalDataCull = signalData[:,combinationInds[0]]
+            for featureInd in combinationInds[1:]:
                 signalDataCull = np.dstack((signalDataCull, signalData[:,featureInd]))
-            if len(listOfCombinationInds) != 1:
+            # Format the features into a 2D array
+            if len(combinationInds) != 1:
                 signalDataCull = signalDataCull[0]
             else:
                 signalDataCull = signalDataCull.reshape(-1, 1)
                 
             # Collect the Specific Feature Names
-            featureNamesPermuteSTR = ''
-            for name in np.array(featureNames)[np.array(listOfCombinationInds)]:
-                featureNamesPermuteSTR += name + ' '
-            featureNames_Combinations.append(featureNamesPermuteSTR[0:-1])
+            featureNamesCombination_String = ''
+            for name in np.array(featureNames)[np.array(combinationInds)]:
+                featureNamesCombination_String += name + ' '
+            featureNames_Combinations.append(featureNamesCombination_String[0:-1])
             
+            # Reset the Input Variab;es
             self.resetModel() # Reset the ML Model
-            # Calculate the Model Score for the Specific Features
             modelScore = []
                 
             # Normalize the Features
@@ -224,14 +225,12 @@ class predictionModelHead:
                 modelScore.append(self.predictionModel.trainModel(Training_Data, Training_Labels, Testing_Data, Testing_Labels))
                 
             else:
-                Training_Data, Testing_Data, Training_Labels, Testing_Labels = train_test_split(signalDataCull, signalLabels, test_size=0.4, shuffle= True, stratify=signalLabels)
-                for _ in range(500):
+                for _ in range(200):
+                    Training_Data, Testing_Data, Training_Labels, Testing_Labels = train_test_split(signalDataCull, signalLabels, test_size=0.3, shuffle= True, stratify=signalLabels)
                     modelScore.append(self.predictionModel.trainModel(Training_Data, Training_Labels, Testing_Data, Testing_Labels))
-                
-
-
+                    
             # Save the Model Score
-            modelScores.append(stats.trim_mean(modelScore, 0.2))
+            modelScores.append(stats.trim_mean(modelScore, 0.3))
             
             # Report an Update Every Now and Then
             if (combinationInd%printUpdateAfterTrial == 0 and combinationInd != 0) or combinationInd == 20:
@@ -260,7 +259,7 @@ class predictionModelHead:
                 newSignalData = np.dstack((newSignalData, signalData[:,featureInd]))
         return newSignalData[0]
 
-    def countScoredFeatures(featureCombinations):
+    def countScoredFeatures(self, featureCombinations):
         allFeatureAppearance = []
         # Create list of all features that appear in the combinations
         for featureCombination in featureCombinations:
@@ -413,21 +412,27 @@ class predictionModelHead:
             for label in range(len(machineLearningClasses)):
                 accMat[label] = (accMat[label]*(roundInd-1) + accMat_Temp[label])/roundInd
 
-        
+        plt.rcParams["axes.edgecolor"] = "black"
+        plt.rcParams["axes.linewidth"] = 2
+        plt.rcParams['font.family'] = 'serif'
+        plt.rcParams['font.serif'] = 'Ubuntu'
+        plt.rcParams['font.monospace'] = 'Ubuntu Mono'
+                
         # Make plot
         fig, ax = plt.subplots()
-        fig.set_size_inches(6,6)
+        fig.set_size_inches(5,5)
         
         # Make heatmap on plot
-        im, cbar = createMap.heatmap(accMat, machineLearningClasses, machineLearningClasses, ax=ax,
-                           cmap="copper", cbarlabel="Gesture Accuracy (%)")
+        im = createMap.heatmap(accMat, machineLearningClasses, machineLearningClasses, ax=ax,
+                           cmap="binary")
         createMap.annotate_heatmap(im, accMat, valfmt="{x:.2f}",)
         
         # Style the Fonts
-        font = {'family' : 'verdana',
-                'weight' : 'bold',
-                'size'   : 10}
+        font = {'family' : 'serif',
+                'serif': 'Ubuntu',
+                'size'   : 20}
         matplotlib.rc('font', **font)
+
         
         # Format, save, and show
         fig.tight_layout()
@@ -518,8 +523,8 @@ class predictionModelHead:
                 shap_values = explainer.shap_values(testingDataPD, nsamples=len(signalData))
             
             # Specify Indivisual Sharp Parameters
-            dataPoint = 10
-            featurePoint = 20
+            dataPoint = 3
+            featurePoint = 2
             
             # Summary Plot
             name = "Summary Plot"
@@ -554,19 +559,19 @@ class predictionModelHead:
             waterfallPlot.savefig(self.saveDataFolder + "SHAP Values/" + name + " " + self.modelType + ".png", bbox_inches='tight', dpi=300)
  
             # Indivisual Decision Plot
-            misclassified = Testing_Labels != self.predictionModel.model.predict(signalData)
+            misclassified = signalLabels != self.predictionModel.model.predict(signalData)
             decisionFolder = self.saveDataFolder + "SHAP Values/Decision Plots/"
             os.makedirs(decisionFolder, exist_ok=True) 
-            for dataPoint1 in range(min(50, len(testingDataPD))):
-                name = "Indivisual Decision Plot DataPoint Num " + str(dataPoint1)
-                decisionPlot = plt.figure()
-                shap.decision_plot(explainer.expected_value, shap_values[dataPoint1,:], features = testingDataPD.iloc[dataPoint1,:], feature_names = featureLabels, feature_order = "importance", highlight = misclassified[dataPoint1])
-                decisionPlot.savefig(decisionFolder + name + " " + self.modelType + ".png", bbox_inches='tight', dpi=300)
+            # for dataPoint1 in range(len(testingDataPD)):
+            #     name = "Indivisual Decision Plot DataPoint Num " + str(dataPoint1)
+            #     decisionPlot = plt.figure()
+            #     shap.decision_plot(explainer.expected_value, shap_values[dataPoint1,:], features = testingDataPD.iloc[dataPoint1,:], feature_names = featureLabels, feature_order = "importance")
+            #     decisionPlot.savefig(decisionFolder + name + " " + self.modelType + ".png", bbox_inches='tight', dpi=300)
             
             # Decision Plot
             name = "Decision Plot"
             decisionPlotOne = plt.figure()
-            shap.decision_plot(explainer.expected_value, shap_values, features = testingDataPD, feature_names = featureLabels, feature_order = "importance", highlight = misclassified)
+            shap.decision_plot(explainer.expected_value, shap_values, features = testingDataPD, feature_names = featureLabels, feature_order = "importance")
             decisionPlotOne.savefig(self.saveDataFolder + "SHAP Values/" + name + " " + self.modelType + ".png", bbox_inches='tight', dpi=300)
             
             # Bar Plot
@@ -575,6 +580,14 @@ class predictionModelHead:
             shap.plots.bar(shap_valuesGeneral, max_display = len(featureLabels), show = True)
             barPlot.savefig(self.saveDataFolder + "SHAP Values/" + name + " " + self.modelType + ".png", bbox_inches='tight', dpi=300)
 
+            # name = "Segmented Bar Plot"
+            # barPlotSegmeneted = plt.figure()
+            # labelTypesNums = [0, 1, 2, 0, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 2]
+            # labelTypes = [listOfStressors[ind] for ind in labelTypesNums]
+            # shap.plots.bar(shap_valuesGeneral.cohorts(labelTypes).abs.mean(0))
+            # barPlotSegmeneted.savefig(self.saveDataFolder + "SHAP Values/" + name + " " + self.modelType + "_Segmented.png", bbox_inches='tight', dpi=300)
+
+                
             # HeatMap Plot
             name = "Heatmap Plot"
             heatmapPlot = plt.figure()
@@ -597,7 +610,7 @@ class predictionModelHead:
                 monitorPlot = plt.figure()
                 shap.monitoring_plot(featurePoint, shap_values, features = testingDataPD, feature_names = featureLabels)
                 monitorPlot.savefig(self.saveDataFolder + "SHAP Values/" + name + " " + self.modelType + ".png", bbox_inches='tight', dpi=300)
-                        
+                          
     def add_value_labels(self, ax, spacing=5):
         """Add labels to the end of each bar in a bar chart.
     

@@ -670,7 +670,7 @@ class signalProcessing:
         dicroticNotchToDicrotic = dicroticPeakTime - dicroticNotchTime
         
         # General Times
-        systolicUpSlopeTime = systolicUpstrokeAccelMinTime - systolicUpstrokeAccelMaxTime
+        systolicRiseDuration = systolicUpstrokeAccelMinTime - systolicUpstrokeAccelMaxTime
         midToEndTidal = tidalEndTime - tidalPeakTime
         tidalToDicroticVelPeakInterval = dicroticRiseVelMaxTime - tidalPeakTime
         # ------------------------------------------------------------------- #
@@ -774,7 +774,7 @@ class signalProcessing:
         # Saving Features from Section: Time Features
         pulseFeatures.extend([pulseDuration, systolicTime, DiastolicTime, leftVentricularPerformance])
         pulseFeatures.extend([maxDerivToSystolic, systolicToTidal, systolicToDicroticNotch, dicroticNotchToTidal, dicroticNotchToDicrotic])
-        pulseFeatures.extend([systolicUpSlopeTime, midToEndTidal, tidalToDicroticVelPeakInterval])
+        pulseFeatures.extend([systolicRiseDuration, midToEndTidal, tidalToDicroticVelPeakInterval])
         
         # Saving Features from Section: Under the Curve Features
         pulseFeatures.extend([pulseArea, pulseAreaSquared, leftVentricleLoad, diastolicArea])
