@@ -10,9 +10,10 @@
     --------------------------------------------------------------------------
     
     Modules to Import Before Running the Program (Some May be Missing):
-        %conda install matplotlib
-        %conda install openpyxl
-        %conda install numpy
+        pip install numpy scikit-learn matplotlib tensorflow openpyxl pyserial joblib pandas
+        pip install natsort pyexcel eeglib pyfirmata2 shap ipywidgets seaborn findpeaks
+        pip install pyexcel pyexcel-xls pyexcel-xlsx BaselineRemoval peakutils lmfit scikit-image
+        
         %pip install pyexcel
         %pip install pyexcel-xls
         %pip install pyexcel-xlsx;
@@ -102,18 +103,19 @@ if __name__ == "__main__":
     # Analysis Parameters
     timePermits = False                      # Construct Plots that Take a Long TIme
     plotFeatures = False                     # Plot the Analyzed Features
-    saveAnalysis = True                      # Save the Analyzed Data: The Peak Features for Each Well-Shaped Pulse
+    saveAnalysis = False                      # Save the Analyzed Data: The Peak Features for Each Well-Shaped Pulse
+    trackRawData = True
     stimulusTimes = [1000, 1000 + 60*3]      # The [Beginning, End] of the Stimulus in Seconds; Type List.
     stimulusTimes_Delayed = [1500, 1500 + 60*3]     # The [Beginning, End] of the Stimulus in Seconds; Type List.
-
+    
     # Specify Which Signals to Use
-    extractGSR = True
+    extractGSR = False
     extractPulse = True
-    extractChemical = True
-    extractTemperature = True
+    extractChemical = False
+    extractTemperature = False
     # Reanalyze Peaks from Scratch (Don't Use Saved Features)
     reanalyzeData_GSR = False
-    reanalyzeData_Pulse = False
+    reanalyzeData_Pulse = True
     reanalyzeData_Chemical = False    
     reanalyzeData_Temperature = False
 
@@ -132,6 +134,7 @@ if __name__ == "__main__":
     listOfStressors = ['cpt', 'exercise', 'vr']                # This Keyword MUST be Present in the Filename
     listOfSensors = ['pulse', 'ise', 'enzym', 'gsr', 'temp']   # This Keyword MUST be Present in the Filename
     
+    # Remove any of the scores: cpt, exercise, vr
     removeScores = [[], [14, 17], []]
     
     # ---------------------------------------------------------------------- #
@@ -195,6 +198,8 @@ if __name__ == "__main__":
         # Create Data Structure to Hold the Features
         pulseFeatures = []
         pulseFeatureLabels = []  
+        # Track one pulse feature
+        rawPulseFeatureData = []
     
     if extractChemical:
         # Specify the Paths to the Chemical Feature Names
@@ -213,6 +218,8 @@ if __name__ == "__main__":
         # Create Data Structure to Hold the Features
         chemicalFeatures_Enzym = []
         chemicalFeatureLabels_Enzym = []
+        # Track raw data
+        rawEnzymData = []
         
         # Specify the Paths to the Chemical Feature Names
         sodiumFeaturesFile = compiledFeatureNamesFolder + "sodiumFeatureNames.txt"
@@ -230,6 +237,8 @@ if __name__ == "__main__":
         # Create Data Structure to Hold the Features
         chemicalFeatures_ISE = []
         chemicalFeatureLabels_ISE = []
+        # Track raw data
+        rawISEData = []
         
     if extractGSR:
         # Specify the Paths to the GSR Feature Names
@@ -239,6 +248,8 @@ if __name__ == "__main__":
         # Create Data Structure to Hold the Features
         gsrFeatures = []
         gsrFeatureLabels = []
+        # Track raw data
+        rawGSRData = []
         
     if extractTemperature:
         # Specify the Paths to the Temperature Feature Names
@@ -248,6 +259,8 @@ if __name__ == "__main__":
         # Create Data Structure to Hold the Features
         temperatureFeatures = []
         temperatureFeatureLabels = []
+        # Track raw data
+        rawTempData = []
         
     # ---------------------------------------------------------------------- #
     # -------------------- Data Collection and Analysis -------------------- #
@@ -439,6 +452,16 @@ if __name__ == "__main__":
                 # Compile the Featues into One Array
                 pulseFeatureLabels.append(featureLabel)
                 pulseFeatures.append(subjectPulseFeatures)
+                
+                if trackRawData:
+                    # Track raw feature
+                    rawPulseFeatureData.append([
+                            featureTimes, 
+                            # pulseFeatureList[:, pulseFeatureNames.index("centralAugmentationIndex_EST_SignalIncrease")]
+                            # pulseFeatureList[:, pulseFeatureNames.index("reflectionIndex_SignalIncrease")]
+                            # pulseFeatureList[:, pulseFeatureNames.index("systolicDicroticNotchAmpRatio_SignalIncrease")]
+                            pulseFeatureList[:, pulseFeatureNames.index("dicroticRiseVelMaxTime_StressLevel")]
+                        ])
     
         # ------------------------ Chemical Analysis ----------------------- #
         
@@ -475,15 +498,7 @@ if __name__ == "__main__":
                     # Read in the Chemical Data from Excel
                     timePoints, chemicalData = excelProcessingChemical.getData(chemicalFile, testSheetNum = 0)
                     glucose, lactate, uricAcid = chemicalData*scaleFactor_Chemical_Enzym # Extract the Specific Chemicals
-                    #lactate = lactate*1000 # Correction on Lactate Data
-                    
-                    # if len(uricAcid) != 0:
-                    #     plt.plot(timePoints, uricAcid, c=colors(cptScore))
-                    #     plt.title("Uric Acid")
-                    #     plt.xlabel("Time (Seconds)")
-                    #     plt.ylabel("Concentration (M)")
-                    
-                    # break
+                    lactate = lactate*1000 # Correction on Lactate Data
                     
                     # Cull Subjects with Missing Data
                     if len(glucose) == 0 or len(lactate) == 0 or len(uricAcid) == 0:
@@ -520,6 +535,14 @@ if __name__ == "__main__":
                 # Compile the Featues into One Array
                 chemicalFeatureLabels_Enzym.append(featureLabel)
                 chemicalFeatures_Enzym.append(subjectChemicalFeatures)
+                
+                if trackRawData:
+                    # Read in the Chemical Data from Excel
+                    timePoints, chemicalData = excelProcessingChemical.getData(chemicalFile, testSheetNum = 0)
+                    glucose, lactate, uricAcid = chemicalData*scaleFactor_Chemical_Enzym # Extract the Specific Chemicals
+                    lactate = lactate*1000 # Correction on Lactate Data
+                    # Track raw feature
+                    rawEnzymData.append([timePoints, glucose, lactate, uricAcid])
             
             # --------------- ISE
             # Loop Through the Pulse Data for Each Stressor
@@ -549,14 +572,7 @@ if __name__ == "__main__":
                     # Read in the Chemical Data from Excel
                     timePoints, chemicalData = excelProcessingChemical.getData(chemicalFile, testSheetNum = 0)
                     sodium, potassium, ammonium = chemicalData*scaleFactor_Chemical_ISE # Extract the Specific Chemicals
-                    
-                    # plt.plot(timePoints, sodium, c=colors(cptScore))
-                    # plt.title("Sodium")
-                    # plt.xlabel("Time (Seconds)")
-                    # plt.ylabel("Concentration (M)")
-                    
-                    # break
-                    
+                                        
                     # Cull Subjects with Missing Data
                     if len(sodium) == 0 or len(potassium) == 0 or len(ammonium) == 0:
                         print("Missing Chemical Data in Folder:", subjectFolder)
@@ -592,6 +608,13 @@ if __name__ == "__main__":
                 # Compile the Featues into One Array
                 chemicalFeatureLabels_ISE.append(featureLabel)
                 chemicalFeatures_ISE.append(subjectChemicalFeatures)
+                
+                if trackRawData:
+                    # Read in the Chemical Data from Excel
+                    timePoints, chemicalData = excelProcessingChemical.getData(chemicalFile, testSheetNum = 0)
+                    sodium, potassium, ammonium = chemicalData*scaleFactor_Chemical_ISE # Extract the Specific Chemicals
+                    # Track raw feature
+                    rawISEData.append([timePoints, sodium, potassium, ammonium])
                         
         # -------------------------- GSR Analysis -------------------------- #
         
@@ -616,11 +639,11 @@ if __name__ == "__main__":
                 else:
                     # Read in the GSR Data from Excel
                     excelDataGSR = excelProcessing.processGSRData()
-                    timeGSR, currentGSR = excelDataGSR.getData(gsrFile, testSheetNum = 0, method = "processed")
+                    timePoints, currentGSR = excelDataGSR.getData(gsrFile, testSheetNum = 0, method = "processed")
                     currentGSR = currentGSR*scaleFactor_GSR # Get Data into micro-Ampes
 
                     # Process the Data
-                    subjectGSRFeatures = gsrAnalysisProtocol.analyzeGSR(timeGSR, currentGSR)
+                    subjectGSRFeatures = gsrAnalysisProtocol.analyzeGSR(timePoints, currentGSR)
                     
                     # Quick Check that All Points Have the Correct Number of Features
                     assert len(subjectGSRFeatures) == len(gsrFeatureNames)
@@ -631,7 +654,15 @@ if __name__ == "__main__":
                 # Compile the Featues into One Array
                 gsrFeatureLabels.append(featureLabel)
                 gsrFeatures.append(subjectGSRFeatures)
-        
+                
+                if trackRawData:
+                    # Read in the GSR Data from Excel
+                    excelDataGSR = excelProcessing.processGSRData()
+                    timePoints, currentGSR = excelDataGSR.getData(gsrFile, testSheetNum = 0, method = "processed")
+                    currentGSR = currentGSR*scaleFactor_GSR # Get Data into micro-Ampes
+                    # Track raw feature
+                    rawGSRData.append([timePoints, currentGSR])  
+                    
         # ---------------------- Temperature Analysis ---------------------- #
         
         if extractTemperature:
@@ -654,11 +685,11 @@ if __name__ == "__main__":
                 else:
                     # Read in the temperature Data from Excel
                     excelDataTemperature = excelProcessing.processTemperatureData()
-                    timeTemp, temperatureData = excelDataTemperature.getData(temperatureFile, testSheetNum = 0)
+                    timePoints, temperatureData = excelDataTemperature.getData(temperatureFile, testSheetNum = 0)
                     temperatureData = temperatureData*scaleFactor_Temperature # Get Data into micro-Ampes
 
                     # Process the Data
-                    subjectTemperatureFeatures = temperatureAnalysisProtocol.analyzeTemperature(timeTemp, temperatureData)
+                    subjectTemperatureFeatures = temperatureAnalysisProtocol.analyzeTemperature(timePoints, temperatureData)
                     
                     # Quick Check that All Points Have the Correct Number of Features
                     assert len(subjectTemperatureFeatures) == len(temperatureFeatureNames)
@@ -669,6 +700,14 @@ if __name__ == "__main__":
                 # Compile the Featues into One Array
                 temperatureFeatureLabels.append(featureLabel)
                 temperatureFeatures.append(subjectTemperatureFeatures)
+                
+                if trackRawData:
+                    # Read in the temperature Data from Excel
+                    excelDataTemperature = excelProcessing.processTemperatureData()
+                    timePoints, temperatureData = excelDataTemperature.getData(temperatureFile, testSheetNum = 0)
+                    temperatureData = temperatureData*scaleFactor_Temperature # Get Data into micro-Ampes
+                    # Track raw feature
+                    rawTempData.append([timePoints, temperatureData])  
 
     # ---------------------- Compile Features Together --------------------- #
     # Compile Labels
@@ -841,9 +880,9 @@ if __name__ == "__main__":
     featureNamesPermute_Good = featureNames_Combinations[np.array(modelScores) >= 0]    
     signalData_Good = performMachineLearning.getSpecificFeatures(featureNames, featureNamesPermute_Good, signalData)
     
-    for numFeaturesCombine in [2]:
+    for numFeaturesCombine in [4]:
         performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(featureNames), machineLearningClasses = listOfStressors, saveDataFolder = saveModelFolder, supportVectorKernel = supportVectorKernel)
-        modelScores, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(signalData_Good, signalLabels, featureNamesPermute_Good, numFeaturesCombine, saveData = False, printUpdateAfterTrial = 100000, scaleY = testStressScores)
+        modelScores, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(signalData_Good, signalLabels, featureNamesPermute_Good, numFeaturesCombine, saveData = True, printUpdateAfterTrial = 100000, scaleY = testStressScores)
     
     
     
@@ -912,7 +951,7 @@ if __name__ == "__main__":
     len(featureFound)
     
     minCount = stats.trim_mean(featureFoundCounter, 0.2)
-    minCount = 2
+    # minCount = 2
     plt.bar(featureFound[featureFoundCounter > minCount], featureFoundCounter[featureFoundCounter > minCount])
     plt.xticks(rotation='vertical')
     
@@ -932,7 +971,7 @@ if __name__ == "__main__":
     
     
     
-    bestFeatures = ['centralAugmentationIndex_EST_SignalIncrease', 'systolicUpSlopeTime_StressLevel', 'tidalPeakTime_StressLevel', 'reflectionIndex_SignalIncrease', 'dicroticNotchToTidal_SignalIncrease']        
+    bestFeatures = ['peripheralAugmentationIndex_EST_SignalIncrease', 'systolicUpSlopeTime_StressLevel', 'tidalPeakTime_StressLevel', 'reflectionIndex_SignalIncrease', 'dicroticNotchToTidalDuration_SignalIncrease']        
     bestFeatures = []
     bestFeatures.extend(pulseFeatureNames)
     bestFeatures.extend(chemicalFeatureNames_Enzym)
@@ -947,7 +986,7 @@ if __name__ == "__main__":
     
     numFeaturesCombine = 1
     performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(bestFeatures), machineLearningClasses = listOfStressors, saveDataFolder = saveFolder, supportVectorKernel = supportVectorKernel)
-    modelScores, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(signalData_Good, signalLabels, bestFeatures, numFeaturesCombine, saveData = True, printUpdateAfterTrial = 15000, scaleY = testStressScores)
+    modelScores, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(signalData_Good, signalLabels, bestFeatures, numFeaturesCombine, saveData = False, printUpdateAfterTrial = 15000, scaleY = testStressScores)
 
     featureNamesPermute_Good = featureNames_Combinations[np.array(modelScores) >= 0.48]    
     signalData_Good = performMachineLearning.getSpecificFeatures(featureNames, featureNamesPermute_Good, signalData)
@@ -964,18 +1003,18 @@ if __name__ == "__main__":
     if False:
         bestFeatures = ['systolicUpstrokeAccelMinVel_StressLevel', 'systolicUpSlopeArea_SignalIncrease', 'velDiffConc_Glucose', 'accelDiffMaxConc_Glucose', 'rightDiffAmp_Lactate']
         
-        bestFeatures = ['reflectionIndex_SignalIncrease', 'dicroticPeakVel_SignalIncrease', 'dicroticPeakAccel_SignalIncrease', 'centralAugmentationIndex_EST_SignalIncrease']
+        bestFeatures = ['reflectionIndex_SignalIncrease', 'dicroticPeakVel_SignalIncrease', 'dicroticPeakAccel_SignalIncrease', 'peripheralAugmentationIndex_EST_SignalIncrease']
         bestFeatures.extend(['bestprominence_GSR'])
         
         #bestFeatures = ['meanStressIncrease_Ammonium', 'dicroticFallVelMinVel_StressLevel', 'endSlope_StressLevel']
         #bestFeatures.extend(['bestprominence_GSR'])
         bestFeatures.extend(['endSlope_StressLevel', 'dicroticFallVelMinVel_StressLevel'])
         
-        bestFeatures = ['centralAugmentationIndex_EST_SignalIncrease', 'systolicUpSlopeTime_StressLevel', 'tidalPeakTime_StressLevel', 'meanSignalRecovery_GSR', 'stressSlope_Ammonium']
+        bestFeatures = ['peripheralAugmentationIndex_EST_SignalIncrease', 'systolicUpSlopeTime_StressLevel', 'tidalPeakTime_StressLevel', 'meanSignalRecovery_GSR', 'stressSlope_Ammonium']
 
         newSignalData = performMachineLearning.getSpecificFeatures(featureNames, bestFeatures, signalData)
         
-        bestFeatures = ['centralAI_Increase', 'systolicRiseDuration', 'tidalPeakTime_StressLevel', 'meanSignalRecovery_GSR', 'stressSlope_Ammonium']        
+        bestFeatures = ['pAIx_Increase', 'systolicRiseDuration', 'tidalPeakTime_StressLevel', 'meanSignalRecovery_GSR', 'stressSlope_Ammonium']        
 
     if False:
         bestFeatures = ['pulseDuration_SignalIncrease', 'stressSlope_Sodium', 'prominenceRatio_GSR', 'systolicDicroticNotchAmpRatio_SignalIncrease', 'peakSTD_Ammonium', 'maxUpSlopeConc_Glucose']
@@ -1020,20 +1059,6 @@ if __name__ == "__main__":
 
     
     
-    
-    testingDataPD = pd.DataFrame(signalData_Standard, columns = bestFeatures)
-    
-    # More General Explainer
-    explainerGeneral = shap.Explainer(performMachineLearning.predictionModel.model.predict, testingDataPD)
-    shap_valuesGeneral = explainerGeneral(testingDataPD)
-
-    explainer = shap.KernelExplainer(performMachineLearning.predictionModel.model.predict, testingDataPD)
-    shap_values = explainer.shap_values(testingDataPD, nsamples=len(signalData_Standard))
-                
-                
-    labelTypesNums = [0, 1, 2, 0, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 2]
-    labelTypes = [listOfStressors[ind] for ind in labelTypesNums]
-    shap.plots.bar(shap_valuesGeneral.cohorts(labelTypes).abs.mean(0))
     
                 
     
@@ -1105,6 +1130,7 @@ if __name__ == "__main__":
         
     
     
+
     
     
     
@@ -1131,73 +1157,259 @@ if __name__ == "__main__":
     
     
     
-    import pandas as pd
-    import holoviews as hv
-    from holoviews import opts, dim
-    from sklearn.preprocessing import StandardScaler
-    
-    hv.extension('matplotlib')
-    hv.output(size=200)
-    
-    selectedFeatures = ['centralAugmentationIndex_EST_SignalIncrease', 'systolicUpSlopeTime_StressLevel', 'tidalPeakTime_StressLevel', 'meanSignalRecovery_GSR', 'stressSlope_Ammonium']
-    newSignalData = performMachineLearning.getSpecificFeatures(featureNames, selectedFeatures, signalData)
-    selectedFeatures = ['centralAI_Increase', 'systolicRiseDuration', 'tidalPeakTime_StressLevel', 'meanSignalRecovery_GSR', 'stressSlope_Ammonium']        
-    
-    sc_X = StandardScaler()
-    signalData_Standard = sc_X.fit_transform(newSignalData)
-    
-    matrix = np.array(np.corrcoef(signalData_Standard.T)); 
-    
-    storeChordInfo = []
-    for sourceInd in range(len(newSignalData[0])):
-        for targetInd in range(sourceInd+1, len(newSignalData[0])):
-            
-            chordInfo = {}
-            chordInfo['source'] = sourceInd
-            chordInfo['target'] = targetInd
-            chordInfo['value'] = abs(matrix[sourceInd][targetInd])  # np.corrcoef([signalData[:,sourceInd], signalData[:,targetInd]])[0][1]
-            
-            storeChordInfo.append(chordInfo)
-    
-    storeNodeInfo = []
-    for sourceInd in range(len(newSignalData[0])):
-        
-        nodeInfo = {}
-        nodeInfo['name'] = selectedFeatures[sourceInd]
-        nodeInfo['group'] = 1
-        
-        storeNodeInfo.append(nodeInfo)
-    
-    links = pd.DataFrame(storeChordInfo)
-    nodes = hv.Dataset(pd.DataFrame(storeNodeInfo), 'index')
-    
-    chord = hv.Chord((links, nodes))
-    chord.opts(
-        opts.Chord(cmap='Category20', edge_cmap='Category20', edge_color=dim('source').str(),
-                   labels='name', node_color=dim('index').str(), edge_linewidth = 5))    
-        
-    hv.save(chord, './chordDiagram.png', fmt='png', dpi=300)
     
     
     
-    import pandas as pd
-    import holoviews as hv
-    from holoviews import opts, dim
-    from sklearn.preprocessing import StandardScaler
     
+    bestFeatures = ['centralAugmentationIndex_EST_SignalIncrease', 'systolicUpSlopeTime_StressLevel', 'tidalPeakTime_StressLevel', 'reflectionIndex_SignalIncrease', 'dicroticNotchTime_StressLevel']        
+    # bestFeatures = []
+    # bestFeatures.extend(pulseFeatureNames)
+    # bestFeatures.extend(chemicalFeatureNames_Enzym)
+    # bestFeatures.extend(chemicalFeatureNames_ISE)
+    # bestFeatures.extend(gsrFeatureNames)
+    bestFeatures.extend(temperatureFeatureNames)
+    
+    newSignalData = performMachineLearning.getSpecificFeatures(featureNames, bestFeatures, signalData)
     
     numFeaturesCombine = 1
-    performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(featureNames), machineLearningClasses = listOfStressors, saveDataFolder = saveModelFolder, supportVectorKernel = supportVectorKernel)
-    modelScores, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(signalData, signalLabels, featureNames, numFeaturesCombine, saveData = False, printUpdateAfterTrial = 15000, scaleY = testStressScores)
-   
-    featureNamesPermute_Good = featureNames_Combinations[np.array(modelScores) >= 0]    
-    signalData_Good = performMachineLearning.getSpecificFeatures(featureNames, featureNamesPermute_Good, signalData)
+    performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(bestFeatures), machineLearningClasses = listOfStressors, saveDataFolder = saveModelFolder, supportVectorKernel = supportVectorKernel)
+    modelScores, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(newSignalData, signalLabels, bestFeatures, numFeaturesCombine, saveData = False, printUpdateAfterTrial = 15000, scaleY = testStressScores)
+
+    bestFeatures = featureNames_Combinations[np.array(modelScores) >= 0]    
+    newSignalData = performMachineLearning.getSpecificFeatures(featureNames, bestFeatures, signalData)
     
+    numFeaturesCombine = 3
+    performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(bestFeatures), machineLearningClasses = listOfStressors, saveDataFolder = saveModelFolder, supportVectorKernel = supportVectorKernel)
+    modelScores, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(newSignalData, signalLabels, bestFeatures, numFeaturesCombine, saveData = False, printUpdateAfterTrial = 15000, scaleY = testStressScores)
+
+    import matplotlib.pyplot as plt
+
+    labels = ['Pulse + feature', '2 Pulse + feature', 'Pulse + 2 features', '5 features']
+    # Add contirbutions
+    pulseContributions = [
+        [[0.486, 0.526, 0.486, 0.544], [0, 0.205, 0, 0.187], [0, 0, 0, 0.0414], [0, 0, 0, 0.0151], [0, 0, 0, 0.01]], # Pulse with GSR
+        [[0.486, 0.526, 0.486, 0], [0, 0.192, 0, 0]], # Pulse wth chemical
+        [[0.526, 0.526, 0.486, 0], [0, 0.192, 0, 0]], # Pulse with temp
+        [[0.544, 0.526, 0.544, 0], [0, 0.205, 0, 0]], # Pulse by itself
+    ]
+    chemicalContributions = [
+        [[0, 0, 0, 0]], # Pulse with GSR
+        [[0.1635, 0.0742, 0.1635, 0.17859], [0, 0, 0.0728, 0.1484],[0, 0, 0, 0.14505], [0, 0, 0, .10675], [0, 0, 0, 0.0697]], # Pulse wth chemical
+        [[0, 0, 0, 0]],# Pulse with temp
+        [[0, 0, 0, 0]], # Pulse by itself
+    ]
+    gsrContributions = [
+        [[0.203, 0.0308, 0.203, 0], [0, 0, 0.0533, 0]], # Pulse with GSR
+        [[0, 0, 0, 0]], # Pulse wth chemical
+        [[0, 0, 0, 0.3415], [0, 0, 0, 0.02],[0, 0, 0, 0.0334], [0, 0, 0, .005], [0, 0, 0, 0]],# Pulse with temp
+        [[0, 0, 0, 0]], # Pulse by itself
+    ]
+    temperatureContributions = [
+        [[0, 0, 0, 0]], # Pulse with GSR
+        [[0, 0, 0, 0]], # Pulse wth chemical
+        [[0.0587, 0.0413, 0.0759, 0], [0, 0, 0.0532, 0]], # Pulse with temp
+        [[0, 0, 0, 0.167], [0, 0, 0, 0.1228],[0, 0, 0, 0.0539], [0, 0, 0, .0051], [0, 0, 0, 0]], # Pulse by itself
+    ]
+    # Specify plot aesthetics
+    totalLength = 1
+    width = totalLength/(1+len(pulseContributions))       # the width of the bars: can also be len(x) sequence
+                
+    fig, ax = plt.subplots()
+    
+    x_axis = np.arange(len(labels))*totalLength
+    for index in range(len(pulseContributions)):
+        pulseValues = np.array(pulseContributions[index])
+        chemicalValues = np.array(chemicalContributions[index])
+        gsrValues = np.array(gsrContributions[index])
+        tempValues = np.array(temperatureContributions[index])
+        
+        for ind, pulseValue in enumerate(pulseValues):
+            ax1 = ax.bar(x_axis + width*(index+totalLength/2), pulseValue, width, bottom=sum(pulseValues[0:ind]), color="royalblue", edgecolor = "black")
+        for ind, chemicalValue in enumerate(chemicalValues):
+            ax2 = ax.bar(x_axis + width*(index+totalLength/2), chemicalValue, width, bottom=sum(chemicalValues[0:ind])+sum(pulseValues), color="tab:purple", edgecolor = "black")
+        for ind, gsrValue in enumerate(gsrValues):
+            ax3 = ax.bar(x_axis + width*(index+totalLength/2), gsrValue, width, bottom=sum(gsrValues[0:ind])+sum(pulseValues)+sum(chemicalValues), color="mediumseagreen", edgecolor = "black")
+        for ind, tempValue in enumerate(tempValues):
+            ax4 = ax.bar(x_axis + width*(index+totalLength/2), tempValue, width, bottom=sum(tempValues[0:ind])+sum(pulseValues)+sum(chemicalValues)+sum(gsrValues), color="tomato", edgecolor = "black")
+    
+    ax.set_ylabel('$R^2$ Contributions')
+    ax.set_title('$R^2$ Contributions from each Biomarker')
+    a = plt.xticks(x_axis+(totalLength-width)/2, labels, fontsize=8)
+    plt.ylim(0,1)
+    ax.legend([ax1, ax2, ax3, ax4], ['$Pulse$', '$Chemical$', '$GSR$', '$Temperature$'], loc = 'center', bbox_to_anchor=(1.18, .835))
+    
+    plt.show()
+
+
+    
+    
+    import plotapi
+    from plotapi import Chord
+    
+    import pandas as pd
+    import holoviews as hv
+    from holoviews import opts, dim
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.decomposition import PCA
+    
+    
+    if False:
+        bestFeatures = ['peripheralAugmentationIndex_EST_SignalIncrease', 'systolicUpSlopeTime_StressLevel', 'tidalPeakTime_StressLevel', 'reflectionIndex_SignalIncrease', 'dicroticNotchToTidalDuration_SignalIncrease']        
+        bestFeatures.extend(chemicalFeatureNames_Enzym)
+        bestFeatures.extend(chemicalFeatureNames_ISE)
+        bestFeatures.extend(gsrFeatureNames)
+        bestFeatures.extend(temperatureFeatureNames)
+        signalData_Good = performMachineLearning.getSpecificFeatures(featureNames, bestFeatures, signalData)
+        
+        numFeaturesCombine = 2
+        performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(bestFeatures), machineLearningClasses = listOfStressors, saveDataFolder = saveModelFolder, supportVectorKernel = supportVectorKernel)
+        modelScores, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(signalData_Good, signalLabels, bestFeatures, numFeaturesCombine, saveData = False, printUpdateAfterTrial = 15000, scaleY = testStressScores)
+    else:
+        numFeaturesCombine = 2
+        performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(featureNames), machineLearningClasses = listOfStressors, saveDataFolder = saveModelFolder, supportVectorKernel = supportVectorKernel)
+        modelScores, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(signalData, signalLabels, featureNames, numFeaturesCombine, saveData = False, printUpdateAfterTrial = 15000, scaleY = testStressScores)
+   
+    
+    featureNamesPermute_Good = featureNames_Combinations[np.array(modelScores) >= 0.54]
+    
+    selectedFeatures = ['Pulse', 'Uric Acid', 'Glucose', 'Lactate', 'GSR', 'Ammonium', 'Temperature', 'Sodium', 'Potassium']
+    selectedFeaturesTypes = ['StressLevel', 'UricAcid', 'Glucose', 'Lactate', 'GSR', 'Ammonium', 'Temperature', 'Sodium', 'Potassium']
+    def findType(name):
+        try:
+            index = selectedFeaturesTypes.index(name)
+        except:
+            if name == 'SignalIncrease':
+                index = 0
+            else:
+                print("AHHHHHH: ", name)
+        return index
+    
+    featureLists = []
+    bestFeatures.append(pulseFeatureNames)
+    bestFeatures.append(chemicalFeatureNames_Enzym)
+    bestFeatures.append(chemicalFeatureNames_ISE)
+    bestFeatures.append(gsrFeatureNames)
+    bestFeatures.append(temperatureFeatureNames)
+    
+    featureOrganization = [[] for _ in range(len(selectedFeatures))]
+    for feature in featureNames:
+        featureOrganization[findType(feature.split('_')[-1])].append(feature)
+    
+    bestFeatures_inEach = []
+    for featureInd in range(len(featureOrganization)):
+        currentFeatures = featureOrganization[featureInd]
+        signalData_ofType = performMachineLearning.getSpecificFeatures(featureNames, currentFeatures, signalData)
+        
+        numFeaturesCombine = 1
+        performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(currentFeatures), machineLearningClasses = listOfStressors, saveDataFolder = saveModelFolder, supportVectorKernel = supportVectorKernel)
+        modelScores, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(signalData_ofType, signalLabels, currentFeatures, numFeaturesCombine, saveData = False, printUpdateAfterTrial = 15000, scaleY = testStressScores)
+
+        bestFeatures_inEach.extend(featureNames_Combinations[0:3])
+    bestData_inEach = performMachineLearning.getSpecificFeatures(featureNames, bestFeatures_inEach, signalData)
     
     sc_X = StandardScaler()
-    signalData_Standard = sc_X.fit_transform(signalData_Good)
-    
+    signalData_Standard = sc_X.fit_transform(bestData_inEach)
     matrix = np.array(np.corrcoef(signalData_Standard.T)); 
+    
+    correlationValues = np.zeros((len(selectedFeatures), len(selectedFeatures)))
+    counterValues = np.zeros((len(selectedFeatures), len(selectedFeatures)))
+    for sourceInd in range(len(matrix)):
+        for targetInd in range(sourceInd+1, len(matrix)): 
+            sourceName = bestFeatures_inEach[sourceInd]
+            targetName = bestFeatures_inEach[targetInd]
+            
+            sourceNameInd = findType(sourceName.split('_')[-1])
+            targetNameInd = findType(targetName.split('_')[-1])
+                        
+            corVal = abs(matrix[sourceInd][targetInd])
+            correlationValues[sourceNameInd][targetNameInd] += corVal
+            correlationValues[targetNameInd][sourceNameInd] += corVal
+            
+            counterValues[sourceNameInd][targetNameInd] += 1
+            counterValues[targetNameInd][sourceNameInd] += 1
+    correlationValues = list(np.round(correlationValues/counterValues, 4)*100)
+    correlationValues = [list(np.round(i)) for i in correlationValues]
+    
+    for i in range(len(correlationValues)):
+        correlationValues[i][i] = 0
+
+
+    import plotapi
+    from sklearn.preprocessing import StandardScaler
+    from plotapi import Chord
+    import scipy
+    
+    plotapi.api_key("ff69182a-324b-46b9-90c5-77a6da9bd050")
+    Chord.api_key("ff69182a-324b-46b9-90c5-77a6da9bd050")
+
+    selectedFeatures = ['Pulse', 'GSR', 'Glucose', 'Lactate', 'Uric Acid', 'Sodium', 'Potassium', 'Ammonium', 'Temperature']
+    rawFeatureList = [[] for _ in range(len(selectedFeatures))]
+    rawDataList = [rawPulseFeatureData, rawGSRData, rawEnzymData, rawISEData, rawTempData]
+    newTimes = np.arange(100, 1900, 1)
+    timeOffsets = [-1, -1, 0, 0, 0, 1, 1, 1, -1]
+    
+    
+    index = 0
+    # interpolate the raw data
+    for rawFeaturesInd in range(len(rawDataList)):
+        rawFeatures = rawDataList[rawFeaturesInd]
+        timeOffset = timeOffsets[rawFeaturesInd]
+        
+        for rawFeature in rawFeatures:
+            rawFeature = np.array(rawFeature)
+            x = rawFeature[0]
+            
+            for yInd in range(len(rawFeature[1:])):
+                y = rawFeature[1 + yInd]
+                
+                f = scipy.interpolate.interp1d(x, y, kind='linear') 
+                if timeOffset == 1:
+                    newData = f(newTimes + 500)
+                else:
+                    newData = f(newTimes)
+                newData = (np.array(newData) - np.mean(newData))/np.std(newData)
+                rawFeatureList[index + yInd].append(newData)
+        index = index + 1 + yInd
+    rawFeatureList = np.array(rawFeatureList)
+    # Scale the data
+    # for dataInd in range(len(rawFeatureList)):
+    #     sc_X = StandardScaler()
+    #     rawFeatureList[dataInd] = sc_X.fit_transform(rawFeatureList[dataInd])
+    
+    correlationMatrixFull = np.zeros((len(selectedFeatures)*2, 2*len(selectedFeatures)))
+    correlationList = [[] for _ in range(len(selectedFeatures))]
+    for rawFeatureInd in range(len(rawFeatureList[0])):
+        
+        currentFeatures = rawFeatureList[:,rawFeatureInd]
+        correlationMatrixFull += abs(np.corrcoef(currentFeatures, currentFeatures))
+    correlationMatrixFull = correlationMatrixFull/len(rawFeatureList[0])
+    
+    correlationMatrix = correlationMatrixFull[0:len(selectedFeatures), 0:len(selectedFeatures)]
+    
+    correlationMatrix = list(np.round(correlationMatrix, 4)*100)
+    correlationMatrix = [list(np.round(i)) for i in correlationMatrix]
+    for i in range(len(correlationMatrix)):
+        correlationMatrix[i][i] = 0
+
+    print(correlationMatrix)
+    
+    Chord(
+        correlationMatrix,
+        selectedFeatures,
+        margin=150,
+        thumbs_margin=1,
+        popup_width=1000,
+        directed=False,
+        arc_numbers=False,
+        animated_intro=True,
+        noun="percent correlated",
+        data_table_show_indices=False,
+        title="Average Feature Correlation Across Biomarkers",
+    ).to_html()
+    
+    
+    
+    from plotapi import Sankey
     
     selectedFeatures = ['Pulse', 'GSR', 'Glucose', 'Lactate', 'Uric Acid', 'Ammonium', 'Sodium', 'Potassium', 'Temperature']
     
@@ -1212,9 +1424,7 @@ if __name__ == "__main__":
                 print("AHHHHHH: ", name)
         return index
     
-    
     counterValues = np.zeros((len(selectedFeatures), len(selectedFeatures)))
-    correlationValues = np.zeros((len(selectedFeatures), len(selectedFeatures)))
     for sourceInd in range(len(matrix)):
         for targetInd in range(sourceInd+1, len(matrix[0])): 
             sourceName = featureNamesPermute_Good[sourceInd]
@@ -1223,49 +1433,48 @@ if __name__ == "__main__":
             sourceNameInd = findType(sourceName.split('_')[-1])
             targetNameInd = findType(targetName.split('_')[-1])
             
-            corVal = abs(matrix[sourceInd][targetInd])
-            correlationValues[sourceNameInd][targetNameInd] += corVal
-            correlationValues[targetNameInd][sourceNameInd] += corVal
-            
             counterValues[sourceNameInd][targetNameInd] += 1
             counterValues[targetNameInd][sourceNameInd] += 1
-    correlationValues = correlationValues/counterValues
     
-    hv.extension('matplotlib')
-    hv.output(size=200)
-    
-    storeChordInfo = []
-    for sourceInd in range(len(selectedFeatures)):
-        for targetInd in range(sourceInd+1, len(selectedFeatures)):
-            
-            chordInfo = {}
-            chordInfo['source'] = sourceInd
-            chordInfo['target'] = targetInd
-            chordInfo['value'] = abs(correlationValues[sourceInd][targetInd])  # np.corrcoef([signalData[:,sourceInd], signalData[:,targetInd]])[0][1]
-            
-            storeChordInfo.append(chordInfo)
-    
-    storeNodeInfo = []
-    for sourceInd in range(len(selectedFeatures)):
+    storeSankeyInfo = []
+    for featureInd in range(1, len(counterValues[0])):        
+        sourceNameInd = featureInd
+        targetNameInd = 0
         
-        nodeInfo = {}
-        nodeInfo['name'] = selectedFeatures[sourceInd]
-        nodeInfo['group'] = sourceInd+1
+        sankeyInfo = {}
+        sankeyInfo['source'] = selectedFeatures[sourceNameInd]
+        sankeyInfo['target'] = selectedFeatures[targetNameInd]
+        sankeyInfo['value'] = counterValues[sourceNameInd][targetNameInd]  # np.corrcoef([signalData[:,sourceInd], signalData[:,targetInd]])[0][1]
         
-        storeNodeInfo.append(nodeInfo)
+        storeSankeyInfo.append(sankeyInfo)        
     
-    links = pd.DataFrame(storeChordInfo)
-    nodes = hv.Dataset(pd.DataFrame(storeNodeInfo), 'index')
-    
-    chord = hv.Chord((links, nodes))
-    chord.opts(
-        opts.Chord(cmap='Category20', edge_cmap='Category20', edge_color=dim('source').str(),
-                   labels='name', node_color=dim('index').str(), edge_linewidth = 5))   
-    
-    hv.save(chord, './chordDiagram.png', fmt='png', dpi=300)
-    
+    Sankey.api_key("ff69182a-324b-46b9-90c5-77a6da9bd050")
+
+    Sankey(
+        storeSankeyInfo,
+        thumbs_margin=1,
+        popup_width=1000,
+        arc_numbers=True,
+        animated_intro=True,
+        data_table_show_indices=False,
+        title="Feature Pairs Explaining at Least 50% of the Stress Scores",
+    ).to_html()
 
         
+    
+    
+    if False:
+        numFeaturesCombine = 1
+        performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(featureNames), machineLearningClasses = listOfStressors, saveDataFolder = saveModelFolder, supportVectorKernel = supportVectorKernel)
+        modelScores1, featureNames_Combinations1 = performMachineLearning.analyzeFeatureCombinations(signalData, signalLabels, featureNames, numFeaturesCombine, saveData = False, printUpdateAfterTrial = 15000, scaleY = testStressScores)
+       
+        featureNamesPermute_Good1 = featureNames_Combinations1[np.array(modelScores1) >= -10000]   
+        
+        featureCounts = np.zeros(len(selectedFeatures))
+        for feature in featureNamesPermute_Good1:
+            featureCounts[findType(feature.split('_')[-1])] += 1
+            
+            
     # # ---------------------------------------------------------------------- #
     # #                          Train the Model                               #
     # # ---------------------------------------------------------------------- #
