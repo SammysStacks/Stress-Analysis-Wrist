@@ -303,14 +303,20 @@ class signalProcessing:
         self.diastolicPressure0 = None  # The Calibrated Diastolic Pressure
         self.diastolicPressure = None   # The Current Diastolic Pressure
         self.systolicPressure = None   # The Current Systolic Pressure
+        self.diastolicPressureList = []
+        self.systolicPressureList = []
+        # Systolic and Diastolic Calibration
         self.calibratedSystolicAmplitude = None    # The Average Amplitude for the Calibrated Systolic/Diastolic Pressure
         self.calibratedSystolicAmplitudeList = []  # A List of Systolic Amplitudes for the Calibration
+        self.calibratedZero = None
+        self.conversionSlope = None
+        self.diastolicPressureInitialList = []
         
         # Save Each Filtered Pulse
         self.time = []
         self.signalData = []
         self.filteredData = []
-        
+
     def setPressureCalibration(self, systolicPressure0, diastolicPressure0):
         self.systolicPressure0 = systolicPressure0    # The Calibrated Systolic Pressure
         self.diastolicPressure0 = diastolicPressure0  # The Calibrated Diastolic Pressure
@@ -449,24 +455,28 @@ class signalProcessing:
             normalizedPulse = pulseData.copy()
             if not self.alreadyFilteredData:
                 normalizedPulse = self.normalizePulseBaseline(normalizedPulse, polynomialDegree = 1)
-                
-            # Calculate the Diastolic Pressure
-            self.diastolicPressure = self.calibrateAmplitude(pulseData[0])
-            self.systolicPressure = self.calibrateAmplitude(max(pulseData))
+            
             # Calculate Diastolic and Systolic Reference of the First Pulse (IF NO REFERENCE GIVEN)
             if not self.diastolicPressure0:
-                diastolicPressure0 = self.diastolicPressure
+                diastolicPressure0 = pulseData[0]
                 systolicPressure0 = self.findNearbyMaximum(signalData, systolicPeaks[pulseNum-1], binarySearchWindow=1, maxPointsSearch=self.maxPointsPerPulse)
                 self.setPressureCalibration(systolicPressure0, diastolicPressure0)
             # --------------------------------------------------------------- #
             
             # -------------------- Extract Pulse Features ------------------- #
             if self.calibratedSystolicAmplitude != None:
+                # Calculate the Diastolic Pressure
+                self.diastolicPressure = self.calibratePressure(pulseData[0])
+                self.systolicPressure = self.calibratePressure(max(pulseData))
+                self.systolicPressureList.append(self.systolicPressure)
+                self.diastolicPressureList.append(self.diastolicPressure)
+                
                 normalizedPulse = self.calibrateAmplitude(normalizedPulse)
                 self.filteredData[previousData+pulseStartInd:previousData+pulseEndInd+1] = normalizedPulse
                 # Label Systolic, Tidal Wave, Dicrotic, and Tail Wave Peaks Using Gaussian Decomposition   
                 self.extractPulsePeaks(pulseTime, normalizedPulse, pulseVelocity, pulseAcceleration, thirdDeriv)
             else:
+                self.diastolicPressureInitialList.append(pulseData[0])
                 self.calibratedSystolicAmplitudeList.append(max(normalizedPulse) - normalizedPulse[0])
             # --------------------------------------------------------------- #
             
@@ -477,14 +487,18 @@ class signalProcessing:
         
         if self.calibratedSystolicAmplitude == None:
             self.calibratedSystolicAmplitude = np.mean(self.calibratedSystolicAmplitudeList)
+            self.conversionSlope = (self.systolicPressure0 - self.diastolicPressure0)/self.calibratedSystolicAmplitude
+            self.calibratedZero = self.diastolicPressure0 - self.conversionSlope*np.mean(self.diastolicPressureInitialList)
         
         # plt.plot(self.heartRateListAverage, 'k-', linewidth=2)
         # plt.ylim(60, 100)
         # plt.show()
     
     def calibrateAmplitude(self, normalizedPulse):
-        scaleAmp = (self.systolicPressure0 - self.diastolicPressure0)/self.calibratedSystolicAmplitude
-        return normalizedPulse*scaleAmp
+        return normalizedPulse*self.conversionSlope
+    
+    def calibratePressure(self, capacitancePoint):
+        return self.conversionSlope*capacitancePoint + self.calibratedZero
     
     def extractPulsePeaks(self, pulseTime, normalizedPulse, pulseVelocity, pulseAcceleration, thirdDeriv):
         
@@ -599,8 +613,8 @@ class signalProcessing:
         self.extractFeatures(normalizedPulse, pulseTime, pulseVelocity, pulseAcceleration, allSystolicPeaks, allTidalPeaks, allDicroticPeaks)
         # ------------------------------------------------------------------- #
         
-        plotClass = plot()
-        plotClass.plotPulseInfo_Amps(pulseTime, normalizedPulse/max(normalizedPulse), pulseVelocity/max(pulseVelocity), pulseAcceleration/max(pulseAcceleration), thirdDeriv/max(thirdDeriv), allSystolicPeaks, allTidalPeaks, allDicroticPeaks, tidalVelocity_ZeroCrossings, tidalAccel_ZeroCrossings)
+        # plotClass = plot()
+        # plotClass.plotPulseInfo_Amps(pulseTime, normalizedPulse/max(normalizedPulse), pulseVelocity/max(pulseVelocity), pulseAcceleration/max(pulseAcceleration), thirdDeriv/max(thirdDeriv), allSystolicPeaks, allTidalPeaks, allDicroticPeaks, tidalVelocity_ZeroCrossings, tidalAccel_ZeroCrossings)
 
         if self.plotGaussFit:
             normalizedPulse1 = normalizedPulse/max(normalizedPulse)
