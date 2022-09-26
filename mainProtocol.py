@@ -266,7 +266,7 @@ if __name__ == "__main__":
     # -------------------- Data Collection and Analysis -------------------- #
     
     # Loop Through Each Subject
-    for subjectFolder in subjectFolderPaths:
+    for subjectFolder in subjectFolderPaths[-3:-1]:
         
         # CPT Score
         cptScore = subjectFolder.split("CPT")

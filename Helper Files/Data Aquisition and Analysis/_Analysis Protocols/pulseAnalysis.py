@@ -107,37 +107,42 @@ class plot:
         else:
             self.plotData(time, filterData, title = "Peak Number " + str(pulseNum), topPeaks = {1:time[pulsePeakInds], 2:filterData[pulsePeakInds]}, bottomPeaks = {1:time[bottomInd], 2:filterData[bottomInd]}, peakSize = 3, lineWidth = 2, lineColor = "black")
         
-    def plotPulseInfo(self, pulseTime, pulseData, pulseVelocity, pulseAcceleration, allSystolicPeaks, allTidalPeaks, allDicroticPeaks):
+    def plotPulseInfo(self, pulseTime, pulseData, pulseVelocity, pulseAcceleration, thirdDeriv, allSystolicPeaks, allTidalPeaks, allDicroticPeaks):
         from matplotlib.ticker import MaxNLocator # added 
 
         # use ggplot style for more sophisticated visuals
         plt.style.use('seaborn-poster')
         
         # Specify Figure aesthetics
-        figWidth = 20; figHeight = 15;
-        fig, axes = plt.subplots(3, 1, sharey=False, sharex = True, gridspec_kw={'hspace': 0},
+        figWidth = 23; figHeight = 18;
+        fig, axes = plt.subplots(4, 1, sharey=False, sharex = True, gridspec_kw={'hspace': 0},
                                      figsize=(figWidth, figHeight))
         
         # Plot the Data
         axes[0].plot(pulseTime, pulseData, 'k', linewidth=2)
         axes[1].plot(pulseTime, pulseVelocity, 'tab:blue', linewidth=2)
         axes[2].plot(pulseTime, pulseAcceleration, 'tab:red', linewidth=2)
+        axes[3].plot(pulseTime, thirdDeriv, 'tab:green', linewidth=2)
         # Set the y-label
         axes[0].set_ylabel("Normalized Pulse")
-        axes[1].set_ylabel("Normalized First Derivative")
-        axes[2].set_ylabel("Normalized Second Derivative")
+        axes[1].set_ylabel("Normalized $1^{rst}$ Derivative")
+        axes[2].set_ylabel("Normalized $2^{nd}$ Derivative")
+        axes[3].set_ylabel("Normalized $3^{rd}$ Derivative")
         
         # Split up the indices
         pulseIndices = [allSystolicPeaks[3], allDicroticPeaks[0], allDicroticPeaks[2]]
-        velIndices = [allSystolicPeaks[1], allTidalPeaks[0], allTidalPeaks[1], allDicroticPeaks[1], allDicroticPeaks[3]]
+        velIndices = [allSystolicPeaks[1], allTidalPeaks[0], allDicroticPeaks[1], allDicroticPeaks[3]]
         accelIndices = [allSystolicPeaks[0], allSystolicPeaks[2]]
+        thirdDerivInds = [allTidalPeaks[1]]
         # Add the Points to the Pulse plot
         axes[0].plot(pulseTime[pulseIndices], pulseData[pulseIndices], 'ok', markersize=13)
         axes[0].plot(pulseTime[velIndices], pulseData[velIndices], 'ok', markersize=13)
         axes[0].plot(pulseTime[accelIndices],  pulseData[accelIndices], 'ok', markersize=13)
+        axes[0].plot(pulseTime[thirdDerivInds],  pulseData[thirdDerivInds], 'ok', markersize=13)
         ymin, ymax = axes[0].get_ylim()
         axes[0].vlines(x=pulseTime[velIndices], ymin=ymin, ymax=ymax, linestyles='dashed', colors='tab:blue')
         axes[0].vlines(x=pulseTime[accelIndices], ymin=ymin, ymax=ymax, linestyles='dashed', colors='tab:red')
+        axes[0].vlines(x=pulseTime[thirdDerivInds], ymin=ymin, ymax=ymax, linestyles='dashed', colors='tab:green')
         axes[0].set_ylim((ymin, ymax))
         axes[0].set_xlim((pulseTime[0], pulseTime[-1]))
         # Add the Points to the Velocity plot
@@ -155,13 +160,21 @@ class plot:
         axes[2].vlines(x=pulseTime[accelIndices], ymin=ymin, ymax=ymax, linestyles='dashed', colors='tab:red')
         axes[2].set_ylim((ymin, ymax))   
         axes[2].set_xlim((pulseTime[0], pulseTime[-1]))
+        # Add the thirdDeriv to the Pulse plot
+        axes[3].plot(pulseTime[thirdDerivInds],  thirdDeriv[thirdDerivInds], 'ok', markersize=13)
+        ymin, ymax = axes[3].get_ylim()
+        axes[3].vlines(x=pulseTime[thirdDerivInds], ymin=ymin, ymax=ymax, linestyles='dashed', colors='tab:green')
+        # axes[0].vlines(x=pulseTime[velIndices], ymin=ymin, ymax=ymax, linestyles='dashed', colors='tab:blue')
+        # axes[0].vlines(x=pulseTime[accelIndices], ymin=ymin, ymax=ymax, linestyles='dashed', colors='tab:red')
+        axes[3].set_ylim((ymin, ymax))
+        axes[3].set_xlim((pulseTime[0], pulseTime[-1]))
         
         # Create surrounding figure
         fig.add_subplot(111, frame_on=False)
         plt.tick_params(labelcolor="none", bottom=False, left=False)
 
         # Add figure labels
-        plt.suptitle('Pulse Feature Extraction', fontsize = 22, x = 0.525, fontweight = "bold")
+        plt.suptitle('Pulse Peaks Extraction', fontsize = 22, x = 0.525, fontweight = "bold")
         plt.xlabel("Time (Seconds)", labelpad = 15)
                 
         # Remove overlap in yTicks
@@ -194,9 +207,9 @@ class plot:
         axes[3].plot(pulseTime, thirdDeriv, 'tab:green', linewidth=2)
         # Set the y-label
         axes[0].set_ylabel("Normalized Pulse")
-        axes[1].set_ylabel("Normalized $1^rst$ Derivative")
-        axes[2].set_ylabel("Normalized $2^nd$ Derivative")
-        axes[3].set_ylabel("Normalized $3^rd$ Derivative")
+        axes[1].set_ylabel("Normalized $1^{rst}$ Derivative")
+        axes[2].set_ylabel("Normalized $2^{nd}$ Derivative")
+        axes[3].set_ylabel("Normalized $3^{rd}$ Derivative")
         
         # Split up the indices
         pulseIndices = [allSystolicPeaks[3], allTidalPeaks[0], allDicroticPeaks[0], allDicroticPeaks[2]]
@@ -242,7 +255,7 @@ class plot:
         plt.tick_params(labelcolor="none", bottom=False, left=False)
 
         # Add figure labels
-        plt.suptitle('Pulse Feature Extraction', fontsize = 22, x = 0.525, fontweight = "bold")
+        plt.suptitle('Tidal Peak Extraction', fontsize = 22, x = 0.525, fontweight = "bold")
         plt.xlabel("Time (Seconds)", labelpad = 15)
                 
         # Remove overlap in yTicks
@@ -529,7 +542,12 @@ class signalProcessing:
             tidalPeakInd = tidalAccel_ZeroCrossings[0] + 1
         # Find Third Derivative Minimum -> Closest First Derivative to Zero
         else:
-            tidalPeakInd = self.findNearbyMinimum(thirdDeriv, tidalStartInd, binarySearchWindow = 4, maxPointsSearch = int(len(pulseTime)/2))
+            tidalEndInd_Estimate = self.findNearbyMinimum(thirdDeriv, tidalEndInd_Estimate, binarySearchWindow = 2, maxPointsSearch = int(len(pulseTime)/2))
+            tidalEndInd_Estimate = self.findNearbyMaximum(thirdDeriv, tidalEndInd_Estimate, binarySearchWindow = 2, maxPointsSearch = int(len(pulseTime)/2))
+            dicroticNotchInd_Estimate = self.findNearbyMinimum(normalizedPulse, tidalEndInd_Estimate, binarySearchWindow = 1, maxPointsSearch = int(len(pulseTime)/2))   
+            tidalEndInd_Estimate = self.findNearbyMinimum(thirdDeriv, dicroticNotchInd_Estimate, binarySearchWindow = -2, maxPointsSearch = int(len(pulseTime)/2))
+            tidalEndInd_Estimate = self.findNearbyMaximum(thirdDeriv, tidalEndInd_Estimate, binarySearchWindow = -2, maxPointsSearch = int(len(pulseTime)/2))
+            tidalPeakInd = self.findNearbyMinimum(thirdDeriv, tidalEndInd_Estimate, binarySearchWindow = -4, maxPointsSearch = int(len(pulseTime)/2))
         # Find Tidal Peak Ending
         tidalEndInd = self.findNearbyMinimum(thirdDeriv, tidalPeakInd, binarySearchWindow = 2, maxPointsSearch = int(len(pulseTime)/2))
         tidalEndInd = self.findNearbyMaximum(thirdDeriv, tidalEndInd, binarySearchWindow = 2, maxPointsSearch = int(len(pulseTime)/2))
@@ -613,8 +631,9 @@ class signalProcessing:
         self.extractFeatures(normalizedPulse, pulseTime, pulseVelocity, pulseAcceleration, allSystolicPeaks, allTidalPeaks, allDicroticPeaks)
         # ------------------------------------------------------------------- #
         
-        # plotClass = plot()
-        # plotClass.plotPulseInfo_Amps(pulseTime, normalizedPulse/max(normalizedPulse), pulseVelocity/max(pulseVelocity), pulseAcceleration/max(pulseAcceleration), thirdDeriv/max(thirdDeriv), allSystolicPeaks, allTidalPeaks, allDicroticPeaks, tidalVelocity_ZeroCrossings, tidalAccel_ZeroCrossings)
+        plotClass = plot()
+        plotClass.plotPulseInfo(pulseTime, normalizedPulse/max(normalizedPulse), pulseVelocity/max(pulseVelocity), pulseAcceleration/max(pulseAcceleration), thirdDeriv/max(thirdDeriv), allSystolicPeaks, allTidalPeaks, allDicroticPeaks)
+        plotClass.plotPulseInfo_Amps(pulseTime, normalizedPulse/max(normalizedPulse), pulseVelocity/max(pulseVelocity), pulseAcceleration/max(pulseAcceleration), thirdDeriv/max(thirdDeriv), allSystolicPeaks, allTidalPeaks, allDicroticPeaks, tidalVelocity_ZeroCrossings, tidalAccel_ZeroCrossings)
 
         if self.plotGaussFit:
             normalizedPulse1 = normalizedPulse/max(normalizedPulse)
