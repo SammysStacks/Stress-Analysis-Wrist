@@ -1,7 +1,9 @@
 "
 peakFeatures.extend = []
+# Saving Features from Section: Time
 peakFeatures.extend([velInterval, velIntervalLeft, velIntervalRight])
-peakFeatures.extend([accelIntervalLeft, accelIntervalRight, accelInterval, thirdDerivInterval])
+peakFeatures.extend([accelIntervalLeft, accelIntervalRight, accelInterval, minAccelToPeak])
+peakFeatures.extend([peakRise_VelAccelInterval, peakFall_VelAccelInterval, thirdDerivInterval])
 
 # Saving Features from Section: Amplitude Features
 peakFeatures.extend([maxUpSlopeConc, maxDownSlopeConc])
@@ -22,5 +24,5 @@ peakFeatures.extend([velToVelArea])
 peakFeatures.extend([peakTentX, peakTentY, tentDeviationX, tentDeviationY, tentDeviationRatio, peakDuration_Final])
 peakFeatures.extend([peakAverage, peakSTD, peakEntropy, peakSkew, peakKurtosis])
 peakFeatures.extend([peakHeightFFT, leftVelHeightFFT,rightVelHeightFFT, peakSTD_FFT, peakEntropyFFT])
-peakFeatures.extend([peakCurvature, leftVelCurvature, rightVelCurvature, peakHeight])
+peakFeatures.extend([peakCurvature, leftVelCurvature, rightVelCurvature])
 "

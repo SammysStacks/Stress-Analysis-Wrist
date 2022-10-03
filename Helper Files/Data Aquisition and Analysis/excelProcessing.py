@@ -638,7 +638,7 @@ class processChemicalData(dataProcessing):
 
 class processMLData(dataProcessing):
     
-    def saveFeatureComparison(self, dataMatrix, rowHeaders, colHeaders, saveDataFolder, saveExcelName, sheetName = "Feature Comparison"):
+    def saveFeatureComparison(self, dataMatrix, rowHeaders, colHeaders, saveDataFolder, saveExcelName, sheetName = "Feature Comparison", saveFirstSheet = False):
         print("Saving the Data")
         # Create Output File Directory to Save Data: If Not Already Created
         os.makedirs(saveDataFolder, exist_ok=True)
@@ -681,6 +681,9 @@ class processMLData(dataProcessing):
             WB_worksheet = self.addExcelAesthetics(WB_worksheet)  
             # Add Sheet
             WB_worksheet = WB.create_sheet(sheetName)
+            
+            if saveFirstSheet:
+                break
 
         WB.remove(WB_worksheet)
         # Save as New Excel File

@@ -1,4 +1,0 @@
-"
-pulseFeatures = [self.timePoint]
-pulseFeatures.extend([systolicDicroticNotchAmpRatio, systolicUpstrokeAccelMinVel])
-"

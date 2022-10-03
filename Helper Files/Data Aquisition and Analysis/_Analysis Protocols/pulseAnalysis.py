@@ -914,8 +914,7 @@ class signalProcessing:
         velocityTimeIntegral_ALT = pseudoStrokeVolume/valveCrossSectionalArea
 
         # Add Index Parameters: https://www.vitalscan.com/dtr_pwv_parameters.htm
-        pAIx = normalizedPulse[np.argmax(pulseVelocity)]/pulsePressure  # Tidal Peak / Systolic Max Vel yData
-        pAIx_EST = tidalPeakAmp/pulsePressure  # Tidal Peak / Systolic Max Vel yData
+        pAIx = tidalPeakAmp/pulsePressure  # Tidal Peak / Systolic Max Vel yData
         reflectionIndex = dicroticPeakAmp/pulsePressure  # Dicrotic Peak / Systolic Peak
         stiffensIndex = 1/(dicroticPeakTime - systolicPeakTime)  # 1/ Time from the Systolic to Dicrotic Peaks
         # ------------------------------------------------------------------- #
@@ -958,7 +957,7 @@ class signalProcessing:
         pulseFeatures.extend([momentumDensity, pseudoCardiacOutput, pseudoStrokeVolume])
         pulseFeatures.extend([diastolicPressure, systolicPressure, pressureRatio, meanArterialBloodPressure, pseudoSystemicVascularResistance])
         pulseFeatures.extend([maxSystolicVelocity, valveCrossSectionalArea, velocityTimeIntegral, velocityTimeIntegralABS, velocityTimeIntegral_ALT])
-        pulseFeatures.extend([pAIx, pAIx_EST, reflectionIndex, stiffensIndex])
+        pulseFeatures.extend([pAIx, reflectionIndex, stiffensIndex])
         
         pulseFeatures.extend(pulseFeatures[1:])
         
@@ -979,23 +978,24 @@ class signalProcessing:
     def butterFilter(self, data, cutoffFreq, samplingFreq, order = 3, filterType = 'band'):
         sos = self.butterParams(cutoffFreq, samplingFreq, order, filterType)
         return scipy.signal.sosfiltfilt(sos, data)
-
-    def findNearbyMinimum(self, data, xPointer, binarySearchWindow = 5, maxPointsSearch = 500):
+    def findNearbyMinimum(self, data, xPointer, binarySearchWindow = 5, maxPointsSearch = 10000):
         """
         Search Right: binarySearchWindow > 0
         Search Left: binarySearchWindow < 0
         """
         # Base Case
         if abs(binarySearchWindow) < 1 or maxPointsSearch == 0:
-            return xPointer - min(2, xPointer) + np.argmin(data[max(0,xPointer-2):min(xPointer+3, len(data))]) 
+            searchSegment = data[max(0,xPointer-1):min(xPointer+2, len(data))]
+            xPointer -= np.where(searchSegment==data[xPointer])[0][0]
+            return xPointer + np.argmin(searchSegment) 
         
         maxHeightPointer = xPointer
         maxHeight = data[xPointer]; searchDirection = binarySearchWindow//abs(binarySearchWindow)
         # Binary Search Data to Find the Minimum (Skip Over Minor Fluctuations)
         for dataPointer in range(max(xPointer, 0), max(0, min(xPointer + searchDirection*maxPointsSearch, len(data))), binarySearchWindow):
             # If the Next Point is Greater Than the Previous, Take a Step Back
-            if data[dataPointer] > maxHeight:
-                return self.findNearbyMinimum(data, dataPointer - binarySearchWindow, round(binarySearchWindow/8), maxPointsSearch - searchDirection*(abs(dataPointer - binarySearchWindow)) - xPointer)
+            if data[dataPointer] >= maxHeight and xPointer != dataPointer:
+                return self.findNearbyMinimum(data, dataPointer - binarySearchWindow, round(binarySearchWindow/4), maxPointsSearch - searchDirection*(abs(dataPointer - binarySearchWindow)) - xPointer)
             # Else, Continue Searching
             else:
                 maxHeightPointer = dataPointer
@@ -1004,7 +1004,7 @@ class signalProcessing:
         # If Your Binary Search is Too Large, Reduce it
         return self.findNearbyMinimum(data, maxHeightPointer, round(binarySearchWindow/2), maxPointsSearch-1)
     
-    def findNearbyMaximum(self, data, xPointer, binarySearchWindow = 5, maxPointsSearch = 500):
+    def findNearbyMaximum(self, data, xPointer, binarySearchWindow = 5, maxPointsSearch = 10000):
         """
         Search Right: binarySearchWindow > 0
         Search Left: binarySearchWindow < 0
@@ -1012,14 +1012,16 @@ class signalProcessing:
         # Base Case
         xPointer = min(max(xPointer, 0), len(data)-1)
         if abs(binarySearchWindow) < 1 or maxPointsSearch == 0:
-            return xPointer - min(2, xPointer) + np.argmax(data[max(0,xPointer-2):min(xPointer+3, len(data))]) 
+            searchSegment = data[max(0,xPointer-1):min(xPointer+2, len(data))]
+            xPointer -= np.where(searchSegment==data[xPointer])[0][0]
+            return xPointer + np.argmax(searchSegment)
         
         minHeightPointer = xPointer; minHeight = data[xPointer];
         searchDirection = binarySearchWindow//abs(binarySearchWindow)
         # Binary Search Data to Find the Minimum (Skip Over Minor Fluctuations)
         for dataPointer in range(xPointer, max(0, min(xPointer + searchDirection*maxPointsSearch, len(data))), binarySearchWindow):
             # If the Next Point is Greater Than the Previous, Take a Step Back
-            if data[dataPointer] < minHeight:
+            if data[dataPointer] < minHeight and xPointer != dataPointer:
                 return self.findNearbyMaximum(data, dataPointer - binarySearchWindow, round(binarySearchWindow/2), maxPointsSearch - searchDirection*(abs(dataPointer - binarySearchWindow)) - xPointer)
             # Else, Continue Searching
             else:

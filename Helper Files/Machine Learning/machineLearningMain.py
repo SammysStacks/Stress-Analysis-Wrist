@@ -184,7 +184,8 @@ class predictionModelHead:
             self.predictionModel.plotStats()
         
         
-    def analyzeFeatureCombinations(self, signalData, signalLabels, featureNames, numFeaturesCombine, saveData = True, printUpdateAfterTrial = 15000, scaleY = True):
+    def analyzeFeatureCombinations(self, signalData, signalLabels, featureNames, numFeaturesCombine, saveData = True, 
+                                   saveExcelName = "Feature Accuracy for Combination of Features.xlsx", printUpdateAfterTrial = 15000, scaleY = True):
         # Get All Possible Combinations
         modelScores = []; featureNames_Combinations = []
         featureInds = list(combinations(range(0, len(featureNames)), numFeaturesCombine))
@@ -225,7 +226,7 @@ class predictionModelHead:
                 modelScore.append(self.predictionModel.trainModel(Training_Data, Training_Labels, Testing_Data, Testing_Labels))
                 
             else:
-                for _ in range(200):
+                for _ in range(500):
                     Training_Data, Testing_Data, Training_Labels, Testing_Labels = train_test_split(signalDataCull, signalLabels, test_size=0.3, shuffle= True, stratify=signalLabels)
                     modelScore.append(self.predictionModel.trainModel(Training_Data, Training_Labels, Testing_Data, Testing_Labels))
                     
@@ -245,7 +246,7 @@ class predictionModelHead:
                     
         # Save the Data in Excel
         if saveData:
-            excelProcessing.processMLData().saveFeatureComparison(np.dstack((modelScores, featureNames_Combinations))[0], [], [], self.saveDataFolder, "Feature Accuracy for Combination of Features.xlsx", sheetName = str(numFeaturesCombine) + " Features in Combination")
+            excelProcessing.processMLData().saveFeatureComparison(np.dstack((modelScores, featureNames_Combinations))[0], [], [], self.saveDataFolder, saveExcelName, sheetName = str(numFeaturesCombine) + " Features in Combination", saveFirstSheet = True)
         return np.array(modelScores), np.array(featureNames_Combinations)
     
     def getSpecificFeatures(self, allFeatureNames, getFeatureNames, signalData):

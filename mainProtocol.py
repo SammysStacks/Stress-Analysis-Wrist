@@ -101,23 +101,22 @@ if __name__ == "__main__":
     # ---------------------------------------------------------------------- #    
 
     # Analysis Parameters
-    timePermits = False                      # Construct Plots that Take a Long TIme
-    plotFeatures = False                     # Plot the Analyzed Features
-    saveAnalysis = False                      # Save the Analyzed Data: The Peak Features for Each Well-Shaped Pulse
+    timePermits = True                      # Construct Plots that Take a Long TIme
+    plotFeatures = True                     # Plot the Analyzed Features
     trackRawData = True
     stimulusTimes = [1000, 1000 + 60*3]      # The [Beginning, End] of the Stimulus in Seconds; Type List.
     stimulusTimes_Delayed = [1500, 1500 + 60*3]     # The [Beginning, End] of the Stimulus in Seconds; Type List.
     
     # Specify Which Signals to Use
-    extractGSR = False
+    extractGSR = True
     extractPulse = True
-    extractChemical = False
-    extractTemperature = False
+    extractChemical = True
+    extractTemperature = True
     # Reanalyze Peaks from Scratch (Don't Use Saved Features)
-    reanalyzeData_GSR = False
+    reanalyzeData_GSR = True
     reanalyzeData_Pulse = True
-    reanalyzeData_Chemical = False    
-    reanalyzeData_Temperature = False
+    reanalyzeData_Chemical = True    
+    reanalyzeData_Temperature = True
 
     # Specify the Unit of Data for Each 
     unitOfData_GSR = "micro"                # Specify the Unit the Data is Represented as: ['', 'milli', 'micro', 'nano', 'pico', 'fempto']
@@ -135,7 +134,7 @@ if __name__ == "__main__":
     listOfSensors = ['pulse', 'ise', 'enzym', 'gsr', 'temp']   # This Keyword MUST be Present in the Filename
     
     # Remove any of the scores: cpt, exercise, vr
-    removeScores = [[], [14, 17], []]
+    removeScores = [[], [], []]
     
     # ---------------------------------------------------------------------- #
     # ------------------------- Preparation Steps -------------------------- #
@@ -266,7 +265,7 @@ if __name__ == "__main__":
     # -------------------- Data Collection and Analysis -------------------- #
     
     # Loop Through Each Subject
-    for subjectFolder in subjectFolderPaths[-3:-1]:
+    for subjectFolder in subjectFolderPaths:
         
         # CPT Score
         cptScore = subjectFolder.split("CPT")
@@ -506,7 +505,7 @@ if __name__ == "__main__":
                         sys.exit()
             
                     # Compile the Features from the Data
-                    chemicalAnalysisProtocol.resetGlobalVariables(stimulusTimes)
+                    chemicalAnalysisProtocol.resetGlobalVariables(stimulusTimes, saveCompiledDataChemical)
                     chemicalAnalysisProtocol.analyzeChemicals(timePoints, [glucose, lactate, uricAcid], ['glucose', 'lactate', 'uricAcid'], featureLabel)
                     # Get the ChemicalFeatures
                     glucoseFeatures = chemicalAnalysisProtocol.chemicalFeatures['glucoseFeatures'][0][0]
@@ -579,7 +578,7 @@ if __name__ == "__main__":
                         sys.exit()
             
                     # Compile the Features from the Data
-                    chemicalAnalysisProtocol.resetGlobalVariables(stimulusTimes_Delayed)
+                    chemicalAnalysisProtocol.resetGlobalVariables(stimulusTimes_Delayed, saveCompiledDataChemical)
                     chemicalAnalysisProtocol.analyzeChemicals(timePoints, [sodium, potassium, ammonium], ['sodium', 'potassium', 'ammonium'], featureLabel, iseData = True)
                     # Get the ChemicalFeatures
                     sodiumFeatures = chemicalAnalysisProtocol.chemicalFeatures['sodiumFeatures'][0]
@@ -866,25 +865,33 @@ if __name__ == "__main__":
         modelPath = "./Helper Files/Machine Learning Modules/Models/machineLearningModel_ALL.pkl"
         saveModelFolder = dataFolderWithSubjects + "Machine Learning/" + modelType + "/"
 
-    # Get the Machine Learning Module
-    performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(featureNames), machineLearningClasses = listOfStressors, saveDataFolder = saveModelFolder, supportVectorKernel = supportVectorKernel)
-    # # Train the Data on the Gestures
-    # print(performMachineLearning.trainModel(signalData, signalLabels, featureNames, returnScore = True, stratifyBy = stressLabels))
-    # print(performMachineLearning.predictionModel.scoreModel(signalData, signalLabels))
-    sys.exit()
-    
-    numFeaturesCombine = 1
-    performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(featureNames), machineLearningClasses = listOfStressors, saveDataFolder = saveModelFolder, supportVectorKernel = supportVectorKernel)
-    modelScores, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(signalData, signalLabels, featureNames, numFeaturesCombine, saveData = False, printUpdateAfterTrial = 15000, scaleY = testStressScores)
-   
-    featureNamesPermute_Good = featureNames_Combinations[np.array(modelScores) >= 0]    
-    signalData_Good = performMachineLearning.getSpecificFeatures(featureNames, featureNamesPermute_Good, signalData)
-    
-    for numFeaturesCombine in [4]:
+    # Fit model to all feature combinations
+    saveExcelName = "All Feature Combinations.xlsx"
+    for numFeaturesCombine in [1, 2, 3, 4, 5, 6]:
         performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(featureNames), machineLearningClasses = listOfStressors, saveDataFolder = saveModelFolder, supportVectorKernel = supportVectorKernel)
-        modelScores, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(signalData_Good, signalLabels, featureNamesPermute_Good, numFeaturesCombine, saveData = True, printUpdateAfterTrial = 100000, scaleY = testStressScores)
+        modelScores, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(signalData, signalLabels, featureNames, numFeaturesCombine, saveData = True, saveExcelName = saveExcelName, printUpdateAfterTrial = 30000, scaleY = testStressScores)
+      
+    # Organize features by type of biomarker
+    allChemicalFeatureNames = chemicalFeatureNames_Enzym.copy()
+    allChemicalFeatureNames.extend(chemicalFeatureNames_ISE)
+    featureNamesListOrder = ["Pulse", "Chemical", "Enzymatic", "ISE", "GSR", "Temperature"]
+    featureNamesList = [pulseFeatureNames, allChemicalFeatureNames, chemicalFeatureNames_Enzym, chemicalFeatureNames_ISE, gsrFeatureNames, temperatureFeatureNames]
     
-    
+    # For each biomarker
+    for currentFeatureNamesInd in range(len(featureNamesList)):
+        featureType = featureNamesListOrder[currentFeatureNamesInd]
+        currentFeatureNames = np.array(featureNamesList[currentFeatureNamesInd])
+        
+        signalData_Good = performMachineLearning.getSpecificFeatures(featureNames, currentFeatureNames, signalData)
+        saveFolder = saveModelFolder + featureType + " Feature Combination/"
+        saveExcelName = featureType + " Feature Combinations.xlsx"
+        
+        # Fit model to all feature combinations
+        for numFeaturesCombine in [1, 2, 3, 4, 5, 6]:
+            performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(currentFeatureNames), machineLearningClasses = listOfStressors, saveDataFolder = saveFolder, supportVectorKernel = supportVectorKernel)
+            modelScores, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(signalData_Good, signalLabels, currentFeatureNames, numFeaturesCombine, saveData = True, saveExcelName = saveExcelName, printUpdateAfterTrial = 30000, scaleY = testStressScores)
+       
+     
     
     sys.exit("STOPPING")
     
