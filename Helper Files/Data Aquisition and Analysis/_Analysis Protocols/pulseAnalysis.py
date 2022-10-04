@@ -593,8 +593,8 @@ class signalProcessing:
 
         # ------------------------- Cull Bad Pulses ------------------------- #
         # Check The Order of the Systolic Peaks
-        if not 0 < systolicUpstrokeAccelMaxInd < systolicUpstrokeVelInd < systolicUpstrokeAccelMinInd < systolicPeakInd:
-            print("\t\tBad Systolic Sequence. Time = ", self.timePoint); 
+        if not systolicUpstrokeAccelMaxInd < systolicUpstrokeVelInd < systolicUpstrokeAccelMinInd < systolicPeakInd:
+            print("\t\tBad Systolic Sequence. Time = ", self.timePoint)
             # plotIt("SYSTOLIC")
             return None
         # Check The Order of the Tidal Peaks
