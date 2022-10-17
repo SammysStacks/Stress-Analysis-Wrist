@@ -202,6 +202,10 @@ class featureAnalysis:
                 else:
                     plt.plot(features1[ind], features2[ind], colorList[labelInd])
             
+            p = np.polyfit(features1, features2, 1)
+            xNew = np.arange(min(features1), max(features1), (max(features1) - min(features1))/1000)
+            plt.plot(xNew, np.polyval(p, xNew), 'k-', linewidth=2)
+            
             plt.xlabel(featureNames1[featureInd1])
             plt.ylabel(featuresLabel2)
             plt.title("Feature Comparison")

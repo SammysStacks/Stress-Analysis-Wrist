@@ -844,7 +844,7 @@ if __name__ == "__main__":
         #Compare Stress Scores with the Features
         analyzeFeatures = featureAnalysis.featureAnalysis([], [], featureNames, [None, None], dataFolderWithSubjects + "Machine Learning/Compiled Stress Score Feature Analysis/")
         analyzeFeatures.featureComparisonAgainstONE(signalData, scoreLabels, stressLabels, featureNames, "Stress Scores", 'Stress Scores')
-    
+
     # ---------------------------------------------------------------------- #
     # ---------------------- Machine Learning Analysis --------------------- #
     print("\nBeginning Machine Learning Section")
