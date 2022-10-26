@@ -631,9 +631,9 @@ class signalProcessing:
         self.extractFeatures(normalizedPulse, pulseTime, pulseVelocity, pulseAcceleration, allSystolicPeaks, allTidalPeaks, allDicroticPeaks)
         # ------------------------------------------------------------------- #
         
-        plotClass = plot()
-        plotClass.plotPulseInfo(pulseTime, normalizedPulse/max(normalizedPulse), pulseVelocity/max(pulseVelocity), pulseAcceleration/max(pulseAcceleration), thirdDeriv/max(thirdDeriv), allSystolicPeaks, allTidalPeaks, allDicroticPeaks)
-        plotClass.plotPulseInfo_Amps(pulseTime, normalizedPulse/max(normalizedPulse), pulseVelocity/max(pulseVelocity), pulseAcceleration/max(pulseAcceleration), thirdDeriv/max(thirdDeriv), allSystolicPeaks, allTidalPeaks, allDicroticPeaks, tidalVelocity_ZeroCrossings, tidalAccel_ZeroCrossings)
+        # plotClass = plot()
+        # plotClass.plotPulseInfo(pulseTime, normalizedPulse/max(normalizedPulse), pulseVelocity/max(pulseVelocity), pulseAcceleration/max(pulseAcceleration), thirdDeriv/max(thirdDeriv), allSystolicPeaks, allTidalPeaks, allDicroticPeaks)
+        # plotClass.plotPulseInfo_Amps(pulseTime, normalizedPulse/max(normalizedPulse), pulseVelocity/max(pulseVelocity), pulseAcceleration/max(pulseAcceleration), thirdDeriv/max(thirdDeriv), allSystolicPeaks, allTidalPeaks, allDicroticPeaks, tidalVelocity_ZeroCrossings, tidalAccel_ZeroCrossings)
 
         if self.plotGaussFit:
             normalizedPulse1 = normalizedPulse/max(normalizedPulse)

@@ -1,5 +1,7 @@
 "
 peakFeatures.extend = []
+peakFeatures.extend([peakConcentration, peakLeftBaselineConc, peakRightBaselineConc])
+
 # Saving Features from Section: Time
 peakFeatures.extend([velInterval, velIntervalLeft, velIntervalRight])
 peakFeatures.extend([accelIntervalLeft, accelIntervalRight, accelInterval, minAccelToPeak])

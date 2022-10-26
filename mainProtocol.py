@@ -10,18 +10,9 @@
     --------------------------------------------------------------------------
     
     Modules to Import Before Running the Program (Some May be Missing):
-        pip install numpy scikit-learn matplotlib tensorflow openpyxl pyserial joblib pandas
-        pip install natsort pyexcel eeglib pyfirmata2 shap ipywidgets seaborn findpeaks
-        pip install pyexcel pyexcel-xls pyexcel-xlsx BaselineRemoval peakutils lmfit scikit-image
-        
-        %pip install pyexcel
-        %pip install pyexcel-xls
-        %pip install pyexcel-xlsx;
-        %pip install BaselineRemoval
-        %pip install peakutils
-        %pip install lmfit
-        %pip install findpeaks
-        %pip install scikit-image
+        pip install -U numpy scikit-learn matplotlib tensorflow openpyxl pyserial joblib pandas
+        pip install -U natsort pyexcel shap seaborn findpeaks keras
+        pip install -U pyexcel pyexcel-xls pyexcel-xlsx BaselineRemoval peakutils lmfit scikit-image
         
     --------------------------------------------------------------------------
 """
@@ -90,6 +81,12 @@ colors = cm.get_cmap(red_green_cm, N)
 
 # fig = plt.figure()
 
+# basinhopping
+# ampgo
+# cg
+
+
+# bfgs
 
 
 # -------------------------------------------------------------------------- #
@@ -101,9 +98,9 @@ if __name__ == "__main__":
     # ---------------------------------------------------------------------- #    
 
     # Analysis Parameters
-    timePermits = True                      # Construct Plots that Take a Long TIme
-    plotFeatures = True                     # Plot the Analyzed Features
-    trackRawData = True
+    timePermits = False                      # Construct Plots that Take a Long TIme
+    plotFeatures = False                     # Plot the Analyzed Features
+    trackRawData = False
     stimulusTimes = [1000, 1000 + 60*3]      # The [Beginning, End] of the Stimulus in Seconds; Type List.
     stimulusTimes_Delayed = [1500, 1500 + 60*3]     # The [Beginning, End] of the Stimulus in Seconds; Type List.
     
@@ -113,10 +110,10 @@ if __name__ == "__main__":
     extractChemical = True
     extractTemperature = True
     # Reanalyze Peaks from Scratch (Don't Use Saved Features)
-    reanalyzeData_GSR = True
-    reanalyzeData_Pulse = True
-    reanalyzeData_Chemical = True    
-    reanalyzeData_Temperature = True
+    reanalyzeData_GSR = False
+    reanalyzeData_Pulse = False
+    reanalyzeData_Chemical = False    
+    reanalyzeData_Temperature = False
 
     # Specify the Unit of Data for Each 
     unitOfData_GSR = "micro"                # Specify the Unit the Data is Represented as: ['', 'milli', 'micro', 'nano', 'pico', 'fempto']
@@ -126,7 +123,7 @@ if __name__ == "__main__":
     unitOfData_Chemical_Enzym = "micro"     # Specify the Unit the Data is Represented as: ['', 'milli', 'micro', 'nano', 'pico', 'fempto']
 
     # Specify the Location of the Subject Files
-    dataFolderWithSubjects = './Input Data/All Data/Current Analysis/Cleaned data for ML Full/'  # Path to ALL the Subject Data. The Path Must End with '/'
+    dataFolderWithSubjects = './Input Data/Current Analysis/'  # Path to ALL the Subject Data. The Path Must End with '/'
     compiledFeatureNamesFolder = "./Helper Files/Machine Learning/Compiled Feature Names/All Features/"
 
     # Specify the Stressors/Sensors Used in this Experiment
@@ -459,7 +456,9 @@ if __name__ == "__main__":
                             # pulseFeatureList[:, pulseFeatureNames.index("centralAugmentationIndex_EST_SignalIncrease")]
                             # pulseFeatureList[:, pulseFeatureNames.index("reflectionIndex_SignalIncrease")]
                             # pulseFeatureList[:, pulseFeatureNames.index("systolicDicroticNotchAmpRatio_SignalIncrease")]
-                            pulseFeatureList[:, pulseFeatureNames.index("dicroticRiseVelMaxTime_StressLevel")]
+                            # pulseFeatureList[:, pulseFeatureNames.index("dicroticRiseVelMaxTime_StressLevel")]
+                            pulseFeatureList[:, pulseFeatureNames.index("dicroticNotchDicroticAccelRatio_SignalIncrease")]
+                            
                         ])
     
         # ------------------------ Chemical Analysis ----------------------- #
@@ -505,13 +504,13 @@ if __name__ == "__main__":
                         sys.exit()
             
                     # Compile the Features from the Data
-                    chemicalAnalysisProtocol.resetGlobalVariables(stimulusTimes, saveCompiledDataChemical)
+                    chemicalAnalysisProtocol.resetGlobalVariables(stimulusTimes_Delayed, saveCompiledDataChemical)
                     chemicalAnalysisProtocol.analyzeChemicals(timePoints, [glucose, lactate, uricAcid], ['glucose', 'lactate', 'uricAcid'], featureLabel)
                     # Get the ChemicalFeatures
                     glucoseFeatures = chemicalAnalysisProtocol.chemicalFeatures['glucoseFeatures'][0][0]
                     lactateFeatures = chemicalAnalysisProtocol.chemicalFeatures['lactateFeatures'][0][0]
                     uricAcidFeatures = chemicalAnalysisProtocol.chemicalFeatures['uricAcidFeatures'][0][0]
-                    chemicalAnalysisProtocol.resetGlobalVariables(stimulusTimes)
+                    chemicalAnalysisProtocol.resetGlobalVariables(stimulusTimes_Delayed)
                     # Verify that Features were Found in for All Chemicals
                     if len(glucoseFeatures) == 0 or len(lactateFeatures) == 0 or len(uricAcidFeatures) == 0:
                         print("No Features Found in Some Chemical Data in Folder:", subjectFolder)
@@ -864,35 +863,62 @@ if __name__ == "__main__":
         supportVectorKernel = "linear" # linear, poly, rbf, sigmoid, precomputed
         modelPath = "./Helper Files/Machine Learning Modules/Models/machineLearningModel_ALL.pkl"
         saveModelFolder = dataFolderWithSubjects + "Machine Learning/" + modelType + "/"
-
-    # Fit model to all feature combinations
-    saveExcelName = "All Feature Combinations.xlsx"
-    for numFeaturesCombine in [1, 2, 3, 4, 5, 6]:
-        performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(featureNames), machineLearningClasses = listOfStressors, saveDataFolder = saveModelFolder, supportVectorKernel = supportVectorKernel)
-        modelScores, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(signalData, signalLabels, featureNames, numFeaturesCombine, saveData = True, saveExcelName = saveExcelName, printUpdateAfterTrial = 30000, scaleY = testStressScores)
-      
+    # Initialize machine learning component.
+    performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(featureNames), machineLearningClasses = listOfStressors, saveDataFolder = saveModelFolder, supportVectorKernel = supportVectorKernel)    
+    # bestFeatures = featureNames #featureNames_Combinations[np.array(modelScores) >= 0]    
+    # newSignalData = performMachineLearning.getSpecificFeatures(featureNames, featureNames, signalData)
+    
+    
+    sys.exit()
+            
     # Organize features by type of biomarker
     allChemicalFeatureNames = chemicalFeatureNames_Enzym.copy()
-    allChemicalFeatureNames.extend(chemicalFeatureNames_ISE)
-    featureNamesListOrder = ["Pulse", "Chemical", "Enzymatic", "ISE", "GSR", "Temperature"]
-    featureNamesList = [pulseFeatureNames, allChemicalFeatureNames, chemicalFeatureNames_Enzym, chemicalFeatureNames_ISE, gsrFeatureNames, temperatureFeatureNames]
+    allChemicalFeatureNames.extend(chemicalFeatureNames_ISE.copy())
+    featureNamesListOrder = ["Enzymatic", "ISE", "Chemical", "Pulse"]
+    featureNamesList = [chemicalFeatureNames_Enzym, chemicalFeatureNames_ISE, allChemicalFeatureNames, pulseFeatureNames]
     
     # For each biomarker
     for currentFeatureNamesInd in range(len(featureNamesList)):
         featureType = featureNamesListOrder[currentFeatureNamesInd]
         currentFeatureNames = np.array(featureNamesList[currentFeatureNamesInd])
         
+        performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(featureNames), machineLearningClasses = listOfStressors, saveDataFolder = saveModelFolder, supportVectorKernel = supportVectorKernel)
         signalData_Good = performMachineLearning.getSpecificFeatures(featureNames, currentFeatureNames, signalData)
         saveFolder = saveModelFolder + featureType + " Feature Combination/"
         saveExcelName = featureType + " Feature Combinations.xlsx"
         
+        # numFeaturesCombine = 1
+        # performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(currentFeatureNames), machineLearningClasses = listOfStressors, saveDataFolder = saveFolder, supportVectorKernel = supportVectorKernel)
+        # modelScores, modelSTDs, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(signalData_Good, signalLabels, currentFeatureNames, numFeaturesCombine, saveData = True, saveExcelName = saveExcelName, printUpdateAfterTrial = 3000000, scaleY = testStressScores)
+
+        # currentFeatureNames = featureNames_Combinations[np.array(modelScores) >= 0.2]    
+        # signalData_Good = performMachineLearning.getSpecificFeatures(featureNames, currentFeatureNames, signalData)
+        
+        numFeaturesCombineList = [5]
+        
         # Fit model to all feature combinations
-        for numFeaturesCombine in [1, 2, 3, 4, 5, 6]:
+        for numFeaturesCombine in numFeaturesCombineList:
+            print(saveExcelName, numFeaturesCombine)
             performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(currentFeatureNames), machineLearningClasses = listOfStressors, saveDataFolder = saveFolder, supportVectorKernel = supportVectorKernel)
-            modelScores, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(signalData_Good, signalLabels, currentFeatureNames, numFeaturesCombine, saveData = True, saveExcelName = saveExcelName, printUpdateAfterTrial = 30000, scaleY = testStressScores)
+            modelScores, modelSTDs, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(signalData_Good, signalLabels, currentFeatureNames, numFeaturesCombine, saveData = True, saveExcelName = saveExcelName, printUpdateAfterTrial = 3000000, scaleY = testStressScores)
        
-     
-    
+                
+    # numFeaturesCombine = 1
+    # saveExcelName = "All Feature Combinations Above R2 20.xlsx"
+    # performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(featureNames), machineLearningClasses = listOfStressors, saveDataFolder = saveModelFolder, supportVectorKernel = supportVectorKernel)
+    # modelScores, modelSTDs, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(signalData, signalLabels, featureNames, numFeaturesCombine, saveData = False, saveExcelName = saveExcelName, printUpdateAfterTrial = 1000000, scaleY = testStressScores)
+
+    # bestFeatures = featureNames_Combinations[np.array(modelScores) >= 0.20]    
+    # newSignalData = performMachineLearning.getSpecificFeatures(featureNames, bestFeatures, signalData)
+                
+    # # Fit model to all feature combinations
+    # # saveExcelName = "All Feature Combinations.xlsx"
+    # for numFeaturesCombine in [5]:
+    #     print(saveExcelName, numFeaturesCombine)
+    #     performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(bestFeatures), machineLearningClasses = listOfStressors, saveDataFolder = saveModelFolder, supportVectorKernel = supportVectorKernel)
+    #     modelScores, modelSTDs, featureNames_Combinations = performMachineLearning.analyzeFeatureCombinations(newSignalData, signalLabels, bestFeatures, numFeaturesCombine, saveData = True, saveExcelName = saveExcelName, printUpdateAfterTrial = 1000000, scaleY = testStressScores)
+
+
     sys.exit("STOPPING")
     
     # modelScores_Single0 = []
@@ -1021,7 +1047,9 @@ if __name__ == "__main__":
 
         newSignalData = performMachineLearning.getSpecificFeatures(featureNames, bestFeatures, signalData)
         
-        bestFeatures = ['pAIx_Increase', 'systolicRiseDuration', 'tidalPeakTime_StressLevel', 'meanSignalRecovery_GSR', 'stressSlope_Ammonium']        
+        bestFeatures = ['pAIx_Increase', 'systolicRiseDuration', 'tidalPeakTime_StressLevel', 'meanSignalRecovery_GSR', 'stressSlope_Ammonium']       
+        
+        bestFeatures = ['velToVelArea_Glucose' ,'peakSTD_GSR', 'systolicRiseDuration_SignalIncrease', 'meanStressIncrease_Temperature']
 
     if False:
         bestFeatures = ['pulseDuration_SignalIncrease', 'stressSlope_Sodium', 'prominenceRatio_GSR', 'systolicDicroticNotchAmpRatio_SignalIncrease', 'peakSTD_Ammonium', 'maxUpSlopeConc_Glucose']
@@ -1033,14 +1061,25 @@ if __name__ == "__main__":
 
     sys.exit()
     
-    
+    # ---------------------------------------------------------------------- #
+    # ---------------------------------------------------------------------- #
+    # ---------------------------------------------------------------------- #
+    # ---------------------------------------------------------------------- #
 
-    performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(bestFeatures), machineLearningClasses = listOfStressors, saveDataFolder = saveModelFolder, supportVectorKernel = supportVectorKernel)
-
-    
     from sklearn.preprocessing import StandardScaler
     sc_X = StandardScaler()
+    
+    bestFeatures = ['velToVelArea_Glucose' ,'peakSTD_GSR', 'systolicRiseDuration_SignalIncrease', 'meanStressIncrease_Temperature']
+    newSignalData = performMachineLearning.getSpecificFeatures(featureNames, bestFeatures, signalData)
     signalData_Standard = sc_X.fit_transform(newSignalData)
+    
+    # Header = ['Stress Score', 'Stress Class']
+    # Header.extend(bestFeatures)
+    # saveInfo = np.hstack((stressLabels.reshape(-1,1), newSignalData))
+    # saveInfo = np.hstack((signalLabels.reshape(-1,1), saveInfo))
+    # excelProcessing.dataProcessing().saveResults(saveInfo, Header, './', 'Final Features.xlsx')
+
+    performMachineLearning = machineLearningMain.predictionModelHead(modelType, modelPath, numFeatures = len(bestFeatures), machineLearningClasses = listOfStressors, saveDataFolder = saveModelFolder, supportVectorKernel = supportVectorKernel)
     
     if testStressScores:
         sc_y = StandardScaler()
@@ -1050,39 +1089,143 @@ if __name__ == "__main__":
     else:
         performMachineLearning.predictionModel.trainModel(signalData_Standard, signalLabels, signalData_Standard, signalLabels)
         performMachineLearning.predictionModel.scoreModel(signalData_Standard, signalLabels)
-    
-    stressEquation = ""
-    featureCoefficients = performMachineLearning.predictionModel.model.coef_[0]
-   # featureCoefficients = performMachineLearning.predictionModel.model.dual_coef_
-    for featureNum in range(len(featureCoefficients)):
-        featureCoef = featureCoefficients[featureNum]
-        featureName = bestFeatures[featureNum]
         
-        stressEquation += str(np.round(featureCoef, 2)) + "*" + featureName + " + "
-    stressEquation[0:-3]
+    if False:
+        from sklearn.model_selection import train_test_split
+        
+        sc_y = StandardScaler()
+        signalLabels_Standard = sc_y.fit_transform(signalLabels.reshape(-1, 1))
+        
+        modelScores = []
+        for _ in range(10000):
+            Training_Data, Testing_Data, Training_Labels, Testing_Labels = train_test_split(signalData_Standard, signalLabels_Standard, test_size=0.2, shuffle= True, stratify=stressLabels)
     
-    
-    performMachineLearning.featureImportance(signalData_Standard, signalLabels_Standard, signalData_Standard, signalLabels_Standard, featureLabels = bestFeatures, numTrials = 1)
+            modelScores.append(performMachineLearning.predictionModel.trainModel(Training_Data, Training_Labels, Testing_Data, Testing_Labels))
+        
+        # Display the Spread of Scores
+        plt.hist(modelScores, 50, facecolor='blue', alpha=0.5)
+        # Fit the Mean Distribution and Save the Mean
+        ae, loce, scalee = stats.skewnorm.fit(modelScores)
+        # Take the Median Score as the True Score
+        meanScore = np.round(loce*100, 2)
 
     
+
+    # Get the fit parameters
+    intercept = performMachineLearning.predictionModel.model.intercept_[0]
+    featureCoefficients = performMachineLearning.predictionModel.model.coef_[0]
+    # Initialize 
+    predictedValues = 0
+    stressEquation = ""
+    offset = intercept*sc_y.scale_[0] + sc_y.mean_[0]
+    
+    # For each feature
+    for featureNum in range(len(featureCoefficients)):
+        # Get the feature information
+        featureCoef = featureCoefficients[featureNum] # The feature coefficient for the scaled data
+        featureName = bestFeatures[featureNum] # The current feature name
+        
+        # Calculate the offset and scale factors
+        scale = sc_y.scale_[0] * featureCoef / sc_X.scale_[featureNum]
+        offset -= sc_y.scale_[0] * featureCoef * sc_X.mean_[featureNum] / sc_X.scale_[featureNum]
+        
+        # Track the equation
+        stressEquation += "{:e}".format(scale) + "*" + featureName + " + "
+        # Predict the a data point
+        predictedValues += scale*newSignalData[0][featureNum]
+        
+    predictedValues += offset
+    stressEquation += "{:e}".format(offset) 
+    print(stressEquation, "\nPrediceted Value: ", predictedValues)
+    
+    # 8.697465e-04*np.max(abs(newSignalData[:,0])), 7.701087e+00*np.max(abs(newSignalData[:,1])), -1.319248e+02*np.max(abs(newSignalData[:,2])), 1.775774e+01*np.max(abs(newSignalData[:,3]))
+    
+    shap_values = performMachineLearning.featureImportance(signalData_Standard, signalLabels_Standard, signalData_Standard, signalLabels_Standard, featureLabels = bestFeatures, numTrials = 1)
+
+    import shap
+    import pandas as pd
+    
+    featureLabels = np.array(bestFeatures)
+    print("Entering SHAP Analysis")
+    # Create Panda DataFrame to Match Input Type for SHAP
+    testingDataPD = pd.DataFrame(signalData_Standard, columns = featureLabels)
+    testingDataPD_Full = pd.DataFrame(newSignalData, columns = featureLabels)
+    
+    # More General Explainer
+    explainerGeneral = shap.Explainer(performMachineLearning.predictionModel.model.predict, testingDataPD)
+    shap_valuesGeneral = explainerGeneral(testingDataPD)
+    
+    # Calculate Shap Values
+    explainer = shap.KernelExplainer(performMachineLearning.predictionModel.model.predict, testingDataPD)
+    shap_values = explainer.shap_values(testingDataPD, nsamples=len(signalData_Standard))
+    
+    shap_values = sc_y.inverse_transform(shap_values) - np.mean(sc_y.inverse_transform(shap_values), axis=0)
+    shap_valuesGeneral.values =  shap_values
+     
+    # Specify Indivisual Sharp Parameters
+    dataPoint = 3
+    featurePoint = 2
+    explainer.expected_value = sc_y.inverse_transform([[explainer.expected_value]])[0][0]
+    shap_valuesGeneral.base_values = sc_y.inverse_transform([shap_valuesGeneral.base_values])[0]
     
     
-                
+    # Summary Plot
+    name = "Summary Plot"
+    summaryPlot = plt.figure()
+    shap.summary_plot(shap_valuesGeneral, testingDataPD_Full, feature_names = featureLabels)
+    summaryPlot.savefig(performMachineLearning.saveDataFolder + "SHAP Values/" + name + " " + performMachineLearning.modelType + ".png", bbox_inches='tight', dpi=300)
+            
+    
+    # Decision Plot
+    name = "Decision Plot"
+    decisionPlotOne = plt.figure()
+    shap.decision_plot(explainer.expected_value, shap_values, features = testingDataPD_Full, feature_names = featureLabels, feature_order = "importance")
+    decisionPlotOne.savefig(performMachineLearning.saveDataFolder + "SHAP Values/" + name + " " + performMachineLearning.modelType + ".png", bbox_inches='tight', dpi=300)
+            
+    # Bar Plot
+    name = "Bar Plot"
+    barPlot = plt.figure()
+    shap.plots.bar(shap_valuesGeneral, max_display = len(featureLabels), show = True)
+    barPlot.savefig(performMachineLearning.saveDataFolder + "SHAP Values/" + name + " " + performMachineLearning.modelType + ".png", bbox_inches='tight', dpi=300)
+
+    name = "Segmented Bar Plot"
+    barPlotSegmeneted = plt.figure()
+    labelTypes = [listOfStressors[ind] for ind in stressLabels]
+    shap.plots.bar(shap_valuesGeneral.cohorts(labelTypes).abs.mean(0))
+    barPlotSegmeneted.axes[0].legend(loc="lower right")
+    barPlotSegmeneted.savefig(performMachineLearning.saveDataFolder + "SHAP Values/" + name + " " + performMachineLearning.modelType + "_Segmented.png", bbox_inches='tight', dpi=300)
+
+    # HeatMap Plot
+    name = "Heatmap Plot"
+    heatmapPlot = plt.figure()
+    shap.plots.heatmap(shap_valuesGeneral, max_display = len(featureLabels), show = True, instance_order=shap_valuesGeneral.sum(1))
+    heatmapPlot.savefig(performMachineLearning.saveDataFolder + "SHAP Values/" + name + " " + performMachineLearning.modelType + ".png", bbox_inches='tight', dpi=300)
+                    
+    
+    # ---------------------------------------------------------------------- #
+    # ---------------------------------------------------------------------- #
+    # ---------------------------------------------------------------------- #
+    # ---------------------------------------------------------------------- #    
+    
     
     predictedLabels = performMachineLearning.predictionModel.predictData(signalData_Standard)
     
-    signalLabels_Unscaled = sc_y.inverse_transform(signalLabels_Standard)
-    predictedLabels_Unscaled = sc_y.inverse_transform(predictedLabels.reshape(-1, 1))
+    signalLabels_Unscaled = sc_y.inverse_transform(signalLabels_Standard).reshape(1,-1)[0]
+    predictedLabels_Unscaled = sc_y.inverse_transform(predictedLabels.reshape(-1, 1)).reshape(1,-1)[0]
     
     fitParams = np.polyfit(signalLabels_Unscaled.flat, predictedLabels_Unscaled.flat, 1)
     p = np.poly1d(fitParams)
     
     plt.plot(sorted(signalLabels_Unscaled), p(sorted(signalLabels_Unscaled)), '--', c='tab:red')
+    plt.fill_between(sorted(signalLabels_Unscaled), p(sorted(signalLabels_Unscaled))-2, 2+p(sorted(signalLabels_Unscaled)), color="#ABABAB", label='Uncertainty in Stress Score')
+    plt.plot(sorted(signalLabels_Unscaled), 2+p(sorted(signalLabels_Unscaled)), '-', c='tab:blue')
+    plt.plot(sorted(signalLabels_Unscaled), p(sorted(signalLabels_Unscaled))-2, '-', c='tab:blue')
     plt.plot(signalLabels_Unscaled, predictedLabels_Unscaled, 'o', c='black')
     plt.title("Stress Prediction Accuracy")
     plt.ylabel("Predicted Stress Score")
     plt.xlabel("Actual Stress Score")
-    plt.legend(['$R^2$ = 0.8828'])
+    plt.legend(['$R^2$ = 0.8769', 'Uncertainty in Score'])
+    plt.show()
     
     
     plt.hlines(3.8, min(signalLabels_Unscaled), max(signalLabels_Unscaled), 'k')
@@ -1097,26 +1240,41 @@ if __name__ == "__main__":
     p = np.poly1d(fitParams)
     
     
-    xAllSensors = [0, 1, 2, 3, 4, 5, 6]
-    yAllSensors = [0, 0.544, 0.731, 0.792, 0.8549, 0.8828, 0.917]
+    # xAllSensors = [0, 1, 2, 3, 4, 5, 6]
+    # yAllSensors = [0, 0.544, 0.731, 0.792, 0.8549, 0.8828, 0.917]
     
-    xChemical = [0, 1, 2, 3, 4, 5, 6][0:-1]
-    yChemical = [0, 0.17859, 0.327, 0.47205, 0.5788, 0.6485]
+    # xChemical = [0, 1, 2, 3, 4, 5, 6][0:-1]
+    # yChemical = [0, 0.17859, 0.327, 0.47205, 0.5788, 0.6485]
     
-    xChemicalISE = [0, 1, 2, 3, 4, 5, 6]
-    yChemicalISE = [0, 0.167, 0.3018, 0.3336, 0.3448, 0.3771, 0.3922]
+    # xChemicalISE = [0, 1, 2, 3, 4, 5, 6]
+    # yChemicalISE = [0, 0.167, 0.3018, 0.3336, 0.3448, 0.3771, 0.3922]
     
-    xChemicalEnzym = [0, 1, 2, 3, 4, 5, 6][0:-1]
-    yChemicalEnzym = [0, 0.17859, 0.32735, 0.44282, 0.54868, 0.59554]
+    # xChemicalEnzym = [0, 1, 2, 3, 4, 5, 6][0:-1]
+    # yChemicalEnzym = [0, 0.17859, 0.32735, 0.44282, 0.54868, 0.59554]
     
-    xPulse = [0, 1, 2, 3, 4, 5, 6][0:-2]
-    yPulse = [0, 0.544, 0.731, 0.7724, 0.7875]
+    # xPulse = [0, 1, 2, 3, 4, 5, 6][0:-2]
+    # yPulse = [0, 0.544, 0.731, 0.7724, 0.7875]
     
-    xGSR = [0, 1, 2, 3, 4, 5, 6]
-    yGSR = [0, 0.3415, 0.3615, 0.3949, 0.3999, 0.3995, 0.3969]
+    # xGSR = [0, 1, 2, 3, 4, 5, 6]
+    # yGSR = [0, 0.3415, 0.3615, 0.3949, 0.3999, 0.3995, 0.3969]
     
-    xTemp = [0, 1, 2, 3, 4, 5, 6]
-    yTemp = [0, 0.167, 0.2898, 0.3437, 0.3488, 0.3452, 0.302]
+    # xTemp = [0, 1, 2, 3, 4, 5, 6]
+    # yTemp = [0, 0.167, 0.2898, 0.3437, 0.3488, 0.3452, 0.302]
+    
+    xAllSensors = [0, 1, 2, 3, 4, 5]
+    yAllSensors = [0, 0.754792733, 0.793598521, 0.843489319, 0.876935824, 0.8983380733751253]
+    
+    xChemical = [0, 1, 2, 3, 4, 5]
+    yChemical = [0, 0.754792733, 0.767105711, 0.768359606, 0.775994562, 0.779629842]
+    
+    xPulse = [0, 1, 2, 3, 4, 5]
+    yPulse = [0, 0.4679258, 0.67592309, 0.715226522, 0.778745543, 0.809167892]
+    
+    xGSR = [0, 1, 2, 3, 4, 5]
+    yGSR = [0, 0.565892316, 0.734183539, 0.732179347, 0.725954197, 0.724841668]
+    
+    xTemp = [0, 1, 2, 3, 4, 5]
+    yTemp = [0, 0.332047234, 0.562707762, 0.581873771, 0.581341113, 0.581626611]
 
     plt.plot(xAllSensors, yAllSensors, 'o--', c='black', markersize=4, label = "All Features")
     # plt.plot(xChemicalEnzym, yChemicalEnzym, 'o--', c='tab:blue', markersize=4, label = "Enzymatic Features")
@@ -1481,47 +1639,7 @@ if __name__ == "__main__":
         for feature in featureNamesPermute_Good1:
             featureCounts[findType(feature.split('_')[-1])] += 1
             
-            
-    # # ---------------------------------------------------------------------- #
-    # #                          Train the Model                               #
-    # # ---------------------------------------------------------------------- #
-    
-    # if trainModel:
-    #     excelDataML = excelProcessing.processMLData()
-    #     # Read in Training Data/Labels
-    #     signalData = []; signalLabels = []; FeatureNames = []
-    #     for MLFile in os.listdir(trainingDataExcelFolder):
-    #         MLFile = trainingDataExcelFolder + MLFile
-    #         signalData, signalLabels, FeatureNames = excelDataML.getData(MLFile, signalData = signalData, signalLabels = signalLabels, testSheetNum = 0)
-    #     signalData = np.array(signalData); signalLabels = np.array(signalLabels)
-    #     # Read in Validation Data/Labels
-    #     Validation_Data = []; Validation_Labels = [];
-    #     for MLFile in os.listdir(validationDataExcelFolder):
-    #         MLFile = validationDataExcelFolder + MLFile
-    #         Validation_Data, Validation_Labels, FeatureNames = excelDataML.getData(MLFile, signalData = Validation_Data, signalLabels = Validation_Labels, testSheetNum = 0)
-    #     Validation_Data = np.array(Validation_Data); Validation_Labels = np.array(Validation_Labels)
-    #     print("\nCollected Signal Data")
-        
-    #     Validation_Data = Validation_Data[:][:,0:6]
-    #     signalData = signalData[:][:,0:6]
-    #     FeatureNames = FeatureNames[0:6]
-                    
-    #     # Train the Data on the Gestures
-    #     performMachineLearning.trainModel(signalData, signalLabels, pulseFeatureNames)
-    #     # Save Signals and Labels
-    #     if False and performMachineLearning.map2D:
-    #         saveInputs = excelProcessing.saveExcel()
-    #         saveExcelNameMap = "mapedData.xlsx" #"Signal Features with Predicted and True Labels New.xlsx"
-    #         saveInputs.saveLabeledPoints(performMachineLearning.map2D, signalLabels,  performMachineLearning.predictionModel.predictData(signalData), saveDataFolder, saveExcelNameMap, sheetName = "Signal Data and Labels")
-    #     # Save the Neural Network (The Weights of Each Edge)
-    #     if saveModel:
-    #         modelPathFolder = os.path.dirname(modelPath)
-    #         os.makedirs(modelPathFolder, exist_ok=True)
-    #         performMachineLearning.predictionModel.saveModel(modelPath)
-    
-    
 
-     
      
      
 

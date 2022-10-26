@@ -42,14 +42,15 @@ class supportVectorRegression:
     
     def createModel(self, modelType = "rbf"):
         # C: penatly term. Low C means that we ignore outliers. High C means that we fit perfectly.
+        # epsilon: the area around the hyperplane where we will ignore error. Large epsilon will 
         if modelType == "linear":
-            self.model = SVR(kernel="linear", C=.5, gamma='scale', epsilon=0.01, coef0=1)
+            self.model = SVR(kernel="linear", C=.1, epsilon=0.193*2)
         elif modelType == "rbf":
             self.model = SVR(kernel="rbf", C=1, gamma='scale', epsilon=0.01)
         elif modelType == "poly":
             self.model = SVR(kernel="poly", C=1, gamma="scale", degree=self.polynomialDegree, epsilon=0.01, coef0=1)
         elif modelType == "sigmoid":
-            self.model = SVR(kernel="sigmoid", C=1, gamma='scale', epsilon=0.01)
+            self.model = SVR(kernel="sigmoid", C=1, gamma='scale', epsilon=0.01, coef0=1)
         elif modelType == "precomputed":
             self.model = SVR(kernel="precomputed", C=1, gamma='scale', epsilon=0.01)
         else:

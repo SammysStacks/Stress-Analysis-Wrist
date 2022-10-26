@@ -1,5 +1,6 @@
 
 # Basic Modules
+import os
 import sys
 import math
 import numpy as np
@@ -7,7 +8,6 @@ import numpy as np
 import scipy
 import scipy.signal
 # Data Filtering Modules
-from scipy.signal import butter
 from scipy.signal import savgol_filter
 # Matlab Plotting Modules
 import matplotlib.pyplot as plt
@@ -15,17 +15,19 @@ import matplotlib.pyplot as plt
 from lmfit import Model
 from sklearn.metrics import r2_score
 # Feature Extraction Modules
+from scipy.fft import fft
 from scipy.stats import skew
 from scipy.stats import entropy
 from scipy.stats import kurtosis
-from scipy.fft import fft, ifft
 from scipy.interpolate import UnivariateSpline
-
-from lmfit.models import GaussianModel
-from lmfit.models import SkewedGaussianModel, SkewedVoigtModel
 
 # Import Files
 import _filteringProtocols as filteringMethods # Import Files with Filtering Methods
+
+# Import Data Extraction Files (And Their Location)
+sys.path.append('./Helper Files/Data Aquisition and Analysis/')  # Folder with All the Helper Files
+import excelProcessing
+
 
 # --------------------------------------------------------------------------- #
 # --------------------------------------------------------------------------- #
@@ -41,20 +43,22 @@ class signalProcessing:
         
         self.plotData = plotData
         
-        self.resetGlobalVariables()  
-        
         self.saveDataFolder = None
+        
+        self.resetGlobalVariables()  
         
         # Define the Class with all the Filtering Methods
         self.filteringMethods = filteringMethods.filteringMethods()
     
     def resetGlobalVariables(self, stimulusTimes = [None, None], saveDataFolder = "./", stimulusBuffer = 500):
         self.saveDataFolder = saveDataFolder
+        os.makedirs(self.saveDataFolder, exist_ok=True)
         
         if stimulusTimes[0] != None:
             self.startStimulus = stimulusTimes[0]
             self.endStimulus = stimulusTimes[1]
             self.endStimulusBuffer = stimulusTimes[1] + stimulusBuffer
+            self.startStimulusBuffer = stimulusTimes[0] - 200
         
         self.chemicalFeatures = {
             # Enzym
@@ -185,8 +189,8 @@ class signalProcessing:
         allProminences = peakProminences[np.logical_and(peakIndices < len(xData) - ignoredBoundaryPoints, peakIndices >= ignoredBoundaryPoints)]
         peakIndices = peakIndices[np.logical_and(peakIndices < len(xData) - ignoredBoundaryPoints, peakIndices >= ignoredBoundaryPoints)]
         # Seperate Out the Stimulus Window
-        allProminences = allProminences[self.startStimulus < xData[peakIndices]]
-        peakIndices = peakIndices[self.startStimulus < xData[peakIndices]]
+        allProminences = allProminences[self.startStimulusBuffer < xData[peakIndices]]
+        peakIndices = peakIndices[self.startStimulusBuffer < xData[peakIndices]]
         allProminences = allProminences[self.endStimulusBuffer > xData[peakIndices]]
         peakIndices = peakIndices[self.endStimulusBuffer > xData[peakIndices]]
 
@@ -367,7 +371,6 @@ class signalProcessing:
         
         # Normalize the Data
         baselineData = baselineData/baselineData[peakInd]
-        peakHeight = baselineData[peakInd]
         xData = xData/baselineData[peakInd]
         
         # Fit the Data
@@ -449,7 +452,7 @@ class signalProcessing:
         baselineData = baselineDataInterpFunc(xData)
         peakInd = np.argmax(baselineData)
         # Gaussdian Decomposition
-        baselineData = self.gausDecomp(xData, baselineData, peakInd, chemicalName)
+        baselineData = self.gausDecomp(xData/max(xData), baselineData/max(baselineData), peakInd, chemicalName)*max(baselineData)
         if len(baselineData) == 0:
             print("Bad Gaussian Decomp")
             return []
@@ -490,8 +493,11 @@ class signalProcessing:
         plt.xlabel("Time (Seconds)")
         plt.ylabel("Normalized peaks")
         plt.legend(prop={'size': 8})
-        fig.savefig(self.saveDataFolder + "Normalized " + chemicalName.capitalize() + " Signal.png", dpi=300, bbox_inches='tight')
+        fig.savefig(self.saveDataFolder + "Normalized " + chemicalName.capitalize() + " Signal.pdf", dpi=300, bbox_inches='tight')
         plt.show()
+        
+        excelProcessing.dataProcessing().saveResults(np.array([xData, baselineData/max(baselineData), velocity/max(abs(velocity)), acceleration/max(abs(acceleration))]).T, ['xData', 'baselineData with peak at ' + str(peakInd), 'Deriv with cutoffs at' + str(leftVelPeakInd) + ', ' + str(rightVelPeakInd), '2nd Deriv with cutoffs at' + str(maxAccelLeftInd) + ', ' + str(minAccelCenterInd) + "," + str(maxAccelRightInd)], self.saveDataFolder, "Normalized " + chemicalName.capitalize() + " Signal.xlsx")
+
         
         # ----------------------- Indivisual Analysis ----------------------- #   
         # Store the Chemical Indices for Feature Extraction
@@ -680,7 +686,6 @@ class signalProcessing:
         
         # Extract Shape Features
         peakSTD = np.std(yData[startStimulusInd:], ddof=1)
-        peakEntropy = entropy(yData[startStimulusInd:])
         
         # Extract Slopes
         restSlope = np.polyfit(xData[int(startStimulusInd/4):int(startStimulusInd*3/4):], yData[int(startStimulusInd/4):int(startStimulusInd*3/4):], 1)[0]
@@ -690,7 +695,7 @@ class signalProcessing:
         # Compile the Features
         peakFeatures = []
         peakFeatures.extend([meanSignal, meanSignalRest, meanSignalStress, meanSignalRecovery, meanStressIncrease])
-        peakFeatures.extend([peakSTD, peakEntropy, restSlope, stressSlope, relaxationSlope])
+        peakFeatures.extend([peakSTD, restSlope, stressSlope, relaxationSlope])
         # ------------------------------------------------------------------ #
         
         return peakFeatures
@@ -708,9 +713,11 @@ class signalProcessing:
         plt.title(chemicalName + " Data")
         plt.xlabel("Time (Sec)")
         plt.ylabel("Concentration (uM)")
-        fig.savefig(self.saveDataFolder + chemicalName.capitalize() + " Data.png", dpi=300, bbox_inches='tight')
+        fig.savefig(self.saveDataFolder + chemicalName.capitalize() + " Data.pdf", dpi=300, bbox_inches='tight')
         # Display the Plot
         plt.show()
+        
+        excelProcessing.dataProcessing().saveResults(np.array([xData, yData, linearFit, baselineData]).T, ['xData', 'yData with peak at ' + str(peakInd), 'linearFit with cutoffs at' + str(leftCutInd) + ', ' + str(rightCutInd), 'baselineData'], self.saveDataFolder, chemicalName.capitalize() + " Data.xlsx")
         
         
     def gaussModel(self, xData, amplitude, fwtm, center):
@@ -730,7 +737,7 @@ class signalProcessing:
         
         gmodel =  Model(self.skewedGaussModel, prefix = "g1_", xData = xData)
         pars = gmodel.make_params()
-        pars['g1_gamma'].set(value = 0, min = -200, max = 200)
+        pars['g1_gamma'].set(value = 0, min = -50, max = 50)
         pars['g1_center'].set(value = xData[peakInd], min = xData[0], max = xData[-1])
         pars['g1_fwtm'].set(value = fwtm*3/4, min = 0.1, max = fwtm)
         pars['g1_amplitude'].set(value = peakAmp, min= 0.1, max = peakAmp*1.1)
@@ -743,18 +750,18 @@ class signalProcessing:
             
             gmodel2 =  Model(self.skewedGaussModel, prefix = "g2_", xData = xData)
             pars.update(gmodel2.make_params())
-            pars['g2_gamma'].set(value = 0, min = -200, max = 200)
+            pars['g2_gamma'].set(value = 0, min = -50, max = 50)
             pars['g2_center'].set(value = peakCenter2, min = xData[0], max = xData[-1])
-            pars['g2_fwtm'].set(value = fwtm/3, min = 0.1, max = fwtm*1.5)
-            pars['g2_amplitude'].set(value = peakAmp2*9/10, min= 0.1, max = peakAmp*1.1)
+            pars['g2_fwtm'].set(value = fwtm/3, min = 0.05, max = fwtm*1.5)
+            pars['g2_amplitude'].set(value = peakAmp2/2, min= 0.025, max = peakAmp)
             gmodel += gmodel2
             
         if addExtraGauss2:
             numberOfGaussians += 1
             gmodel3 =  Model(self.gaussModel, prefix = "g3_", xData = xData)
             pars.update(gmodel3.make_params())
-            pars['g3_amplitude'].set(value = peakAmp/3, min= 0.1, max = peakAmp)
-            pars['g3_fwtm'].set(value = fwtm/5, min = 0.1, max = fwtm)
+            pars['g3_amplitude'].set(value = peakAmp/3, min= 0.025, max = peakAmp)
+            pars['g3_fwtm'].set(value = fwtm/5, min = 0.05, max = fwtm)
             pars['g3_center'].set(value = peakCenter, min = xData[0], max = xData[-1])
             gmodel += gmodel3
         
@@ -762,12 +769,12 @@ class signalProcessing:
             numberOfGaussians += 1
             gmodel4 =  Model(self.gaussModel, prefix = "g4_", xData = xData)
             pars.update(gmodel4.make_params())
-            pars['g4_amplitude'].set(value = peakAmp/4, min= 0.1, max = peakAmp)
-            pars['g4_fwtm'].set(value = fwtm/6, min = 0.1, max = fwtm)
+            pars['g4_amplitude'].set(value = peakAmp/4, min= 0.025, max = peakAmp)
+            pars['g4_fwtm'].set(value = fwtm/6, min = 0.05, max = fwtm)
             pars['g4_center'].set(value = peakCenter, min = xData[0], max = xData[-1])
             gmodel += gmodel4
             
-        finalFitInfo = gmodel.fit(yData, pars, xData=xData, method='powell')
+        finalFitInfo = gmodel.fit(yData, pars, xData=xData, method='bfgs')
 
         coefficient_of_dermination = np.round(r2_score(yData, finalFitInfo.best_fit), 6)
         comps = finalFitInfo.eval_components(xData=xData)
@@ -783,6 +790,9 @@ class signalProcessing:
                     
         # Plot the Pulse with its Fit 
         def plotGaussianFit(xData, yData, peakInd, comps):
+            gaussDecompInfo = [xData, yData];
+            gaussDecompHeader = ["Normalized X-Data", "Normalized Y-Data"]
+            
             fig = plt.figure()
             
             xData = np.array(xData); yData = np.array(yData)
@@ -792,35 +802,41 @@ class signalProcessing:
 
             plt.plot(xData, comps[findBestGaus()], '--', color = "tab:brown", alpha = 1, linewidth=4, label='Chosen Gaussian')
             plt.plot(xData, comps['g1_'], '--', color = "tab:red", alpha = 0.8, label='Skewed Gaussian Fit')
+            
+            gaussDecompHeader.append("Final Fit"); gaussDecompInfo.append(finalFitInfo.best_fit)
+            gaussDecompHeader.append("Final Fit Uncertainty"); gaussDecompInfo.append(dely)
+            gaussDecompHeader.append("Chosen Gaus Data"); gaussDecompInfo.append(comps[findBestGaus()])
+            gaussDecompHeader.append("Gaus Data"); gaussDecompInfo.append(comps['g1_'])
 
             if addExtraGauss:
                 plt.plot(xData, comps['g2_'], '--', color = "tab:blue", alpha = 0.5, label='Extra Skewed Gauss')
+                gaussDecompHeader.append("Second Gaus Data"); gaussDecompInfo.append(comps['g2_'])
             if addExtraGauss2:
                 plt.plot(xData, comps['g3_'], '--', color = "tab:purple", alpha = 0.5, label='Extra Gauss')
+                gaussDecompHeader.append("Third Gaus Data"); gaussDecompInfo.append(comps['g3_'])
             if addExtraGauss3:
                 plt.plot(xData, comps['g4_'], '--', color = "tab:orange", alpha = 0.5, label='Extra Gauss2')
+                gaussDecompHeader.append("Fourth Gaus Data"); gaussDecompInfo.append(comps['g4_'])
 
-            plt.fill_between(xData, finalFitInfo.best_fit-dely, finalFitInfo.best_fit+dely, color="#ABABAB",
-                 label='3-$\sigma$ uncertainty band')
+            plt.fill_between(xData, finalFitInfo.best_fit-dely, finalFitInfo.best_fit+dely, color="#ABABAB", label='3-$\sigma$ uncertainty band')
             
             plt.legend(loc='best')
-            plt.title("Gaussian Decomposition for " + chemicalName)
+            plt.title("Gaussian Decomposition for " + chemicalName + " " + str(np.round(coefficient_of_dermination, 4)))
             plt.xlabel("Time (Seconds)")
             plt.ylabel("Chemical peak")
-            fig.savefig(self.saveDataFolder + chemicalName.capitalize() + " Gaussian Decomposition using " + str(numberOfGaussians) + " Gaussians.png", dpi=300, bbox_inches='tight')
+            fig.savefig(self.saveDataFolder + chemicalName.capitalize() + " Gaussian Decomposition using " + str(numberOfGaussians) + " Gaussians.pdf", dpi=300, bbox_inches='tight')
             plt.show()
             
-            # plt.plot(finalFitInfo.best_fit)
-            # plt.plot(finalFitInfo.init_fit)
-            # plt.show()
+            excelProcessing.dataProcessing().saveResults(np.array(gaussDecompInfo).T, gaussDecompHeader, self.saveDataFolder, chemicalName.capitalize() + " Gaussian Decomposition using " + str(numberOfGaussians) + " Gaussians.xlsx")
         
         dely = finalFitInfo.eval_uncertainty(sigma=3)
         avUncertainty = np.round(sum(finalFitInfo.best_fit-dely)/len(dely), 5)
         plotGaussianFit(xData, yData, peakInd, comps)
-        if coefficient_of_dermination > 0.992 or \
+        if np.mean(dely) < 1 and \
+                (coefficient_of_dermination > 0.984 or \
                 (coefficient_of_dermination > 0.98 and addExtraGauss) or \
-                (coefficient_of_dermination > 0.975 and addExtraGauss2) or \
-                (coefficient_of_dermination > 0.974 and addExtraGauss3):
+                (coefficient_of_dermination > 0.98 and addExtraGauss2) or \
+                (coefficient_of_dermination > 0.98 and addExtraGauss3)):
             bestPrefix = findBestGaus()
             return finalFitInfo.eval_components(xData=xData)[bestPrefix]
         elif not addExtraGauss:

@@ -674,6 +674,7 @@ class processMLData(dataProcessing):
                 
                 dataRow.extend(dataMatrix[rowInd])
                 dataRow[0] = float(dataRow[0])
+                dataRow[1] = float(dataRow[1])
                 # Write the Data to Excel
                 WB_worksheet.append(dataRow)
         

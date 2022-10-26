@@ -81,9 +81,11 @@ class signalProcessing:
         # ------------------------- Filter the Data ------------------------ #
         # Apply a Low Pass Filter
         self.samplingFreq = len(xData)/(xData[-1] - xData[0])
-        yData = self.filteringMethods.savgolFilter.savgolFilter(yData, 21, 2)
         yData = self.filteringMethods.bandPassFilter.butterFilter(yData, self.lowPassCutoff, self.samplingFreq, order = 4, filterType = 'low')
         yData = self.filteringMethods.savgolFilter.savgolFilter(yData, 21, 2)
+        
+        # Normalize the yData
+        yData = (yData.copy() - np.std(yData, ddof=1))/np.mean(yData)
         # ------------------------------------------------------------------ #
         
         # ------------------ Find and Remove the Baseline ------------------ #
@@ -104,7 +106,7 @@ class signalProcessing:
         peakInd = np.argmax(yData[startStimulusInd:])
         
         # Find All Peaks in the Data
-        peakInfo = scipy.signal.find_peaks(yData, prominence=10E-8, width = 20)
+        peakInfo = scipy.signal.find_peaks(yData, prominence=10E-10, width = 20)
         # Extract the Peak Information
         peakProminences = peakInfo[1]['prominences'][peakInfo[0] > startStimulusInd]
         # peakIndices = peakInfo[0][peakInfo[0] > startStimulusInd]
@@ -120,7 +122,7 @@ class signalProcessing:
         prominenceRatio = bestprominence/sumPromineces
         
         # General Features
-        maxHeight = yData[peakInd]
+        maxHeight = yData[peakInd] - np.mean(yData[0:startStimulusInd])
         riseTime = xData[peakInd] - self.startStimulusTime
         halfAmpRecoveryInd = peakInd + np.argmin(abs(yData[peakInd:] - maxHeight/2))
         recoveryTime = xData[halfAmpRecoveryInd] - xData[peakInd]

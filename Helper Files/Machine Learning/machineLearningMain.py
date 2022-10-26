@@ -34,7 +34,7 @@ from sklearn.preprocessing import StandardScaler
 sys.path.append('./Helper Files/Machine Learning/Classification Methods/')
 sys.path.append('./Machine Learning/Classification Methods/') # Folder with Machine Learning Files
 import supportVectorRegression as SVR   # Functions for Support Vector Regression Algorithm
-import neuralNetwork as NeuralNet       # Functions for Neural Network Algorithm
+# import neuralNetwork as NeuralNet       # Functions for Neural Network Algorithm
 import logisticRegression as LR         # Functions for Linear Regression Algorithm
 import ridgeRegression as Ridge         # Functions for Ridge Regression Algorithm
 import elasticNet as elasticNet         # Functions for Elastic Net Algorithm
@@ -187,8 +187,16 @@ class predictionModelHead:
     def analyzeFeatureCombinations(self, signalData, signalLabels, featureNames, numFeaturesCombine, saveData = True, 
                                    saveExcelName = "Feature Accuracy for Combination of Features.xlsx", printUpdateAfterTrial = 15000, scaleY = True):
         # Get All Possible Combinations
-        modelScores = []; featureNames_Combinations = []
+        modelScores = []; modelSTDs = []; featureNames_Combinations = []
         featureInds = list(combinations(range(0, len(featureNames)), numFeaturesCombine))
+        allSubjectInds = list(combinations(range(0, len(signalLabels)),  len(signalLabels) - int(len(signalLabels)*0)))
+        
+        # Normalize the Features
+        sc_X = StandardScaler()
+        signalDataTransform = sc_X.fit_transform(signalData)
+        if scaleY:
+            sc_y = StandardScaler()
+            signalLabels = sc_y.fit_transform(signalLabels.copy().reshape(-1, 1))
         
         t1 = time.time()
         # For Each Combination of Features
@@ -196,14 +204,7 @@ class predictionModelHead:
             combinationInds = featureInds[combinationInd]
             
             # Collect the Signal Data for the Specific Features
-            signalDataCull = signalData[:,combinationInds[0]]
-            for featureInd in combinationInds[1:]:
-                signalDataCull = np.dstack((signalDataCull, signalData[:,featureInd]))
-            # Format the features into a 2D array
-            if len(combinationInds) != 1:
-                signalDataCull = signalDataCull[0]
-            else:
-                signalDataCull = signalDataCull.reshape(-1, 1)
+            signalData_culledFeatures = signalDataTransform[:,combinationInds]
                 
             # Collect the Specific Feature Names
             featureNamesCombination_String = ''
@@ -211,27 +212,26 @@ class predictionModelHead:
                 featureNamesCombination_String += name + ' '
             featureNames_Combinations.append(featureNamesCombination_String[0:-1])
             
-            # Reset the Input Variab;es
-            self.resetModel() # Reset the ML Model
             modelScore = []
+            for subjectInds in allSubjectInds:
+                # Reset the Input Variab;es
+                self.resetModel() # Reset the ML Model
                 
-            # Normalize the Features
-            sc_X = StandardScaler()
-            signalDataCull = sc_X.fit_transform(signalDataCull)
-            if scaleY:
-                sc_y = StandardScaler()
-                signalLabels = sc_y.fit_transform(signalLabels.reshape(-1, 1))
+                # Collect the Signal Data for the Specific Subjects
+                signalDataCull = signalData_culledFeatures[subjectInds, :]
+                signalLabelCull = signalLabels[subjectInds, :]
                 
-                Training_Data, Testing_Data, Training_Labels, Testing_Labels = signalDataCull, signalDataCull, signalLabels, signalLabels
+                # Score the model with this data set.
+                Training_Data, Testing_Data, Training_Labels, Testing_Labels = signalDataCull, signalData_culledFeatures, signalLabelCull, signalLabels
                 modelScore.append(self.predictionModel.trainModel(Training_Data, Training_Labels, Testing_Data, Testing_Labels))
-                
-            else:
-                for _ in range(500):
-                    Training_Data, Testing_Data, Training_Labels, Testing_Labels = train_test_split(signalDataCull, signalLabels, test_size=0.3, shuffle= True, stratify=signalLabels)
-                    modelScore.append(self.predictionModel.trainModel(Training_Data, Training_Labels, Testing_Data, Testing_Labels))
-                    
+
             # Save the Model Score
             modelScores.append(stats.trim_mean(modelScore, 0.3))
+            if len(modelScore) > 1:
+                modelSTDs.append(np.std(modelScore, ddof= 1))
+            else:
+                modelSTDs.append(0)
+            # plt.hist(modelScore); plt.title(featureNamesCombination_String); plt.show()
             
             # Report an Update Every Now and Then
             if (combinationInd%printUpdateAfterTrial == 0 and combinationInd != 0) or combinationInd == 20:
@@ -242,12 +242,13 @@ class predictionModelHead:
                 t1 = time.time()
         
         # Sort the Features
-        modelScores, featureNames_Combinations = zip(*sorted(zip(modelScores, featureNames_Combinations), reverse=True))
-                    
+        modelScores, modelSTDs, featureNames_Combinations = zip(*sorted(zip(modelScores[0:100000], modelSTDs[0:100000], featureNames_Combinations[0:100000]), reverse=True))
+        print(modelScores[0], modelSTDs[0], featureNames_Combinations[0])
+        
         # Save the Data in Excel
         if saveData:
-            excelProcessing.processMLData().saveFeatureComparison(np.dstack((modelScores, featureNames_Combinations))[0], [], [], self.saveDataFolder, saveExcelName, sheetName = str(numFeaturesCombine) + " Features in Combination", saveFirstSheet = True)
-        return np.array(modelScores), np.array(featureNames_Combinations)
+            excelProcessing.processMLData().saveFeatureComparison(np.dstack((modelScores, modelSTDs, featureNames_Combinations))[0], [], ["Mean Score", "STD", "Feature Combination"], self.saveDataFolder, saveExcelName, sheetName = str(numFeaturesCombine) + " Features in Combination", saveFirstSheet = True)
+        return np.array(modelScores), np.array(modelSTDs), np.array(featureNames_Combinations)
     
     def getSpecificFeatures(self, allFeatureNames, getFeatureNames, signalData):
         newSignalData = []
@@ -523,9 +524,13 @@ class predictionModelHead:
                 explainer = shap.KernelExplainer(self.predictionModel.model.predict, testingDataPD)
                 shap_values = explainer.shap_values(testingDataPD, nsamples=len(signalData))
             
+            return shap_values
+            
             # Specify Indivisual Sharp Parameters
             dataPoint = 3
             featurePoint = 2
+            explainer.expected_value = 0
+            
             
             # Summary Plot
             name = "Summary Plot"
